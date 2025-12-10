@@ -1,16 +1,17 @@
+import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
 import Page from '../page'
 
 describe('Home Page', () => {
   it('renders without crashing', () => {
-    render(<Page />)
-    expect(document.body).toBeInTheDocument()
+    const { container } = render(<Page />)
+    expect(container).toBeTruthy()
   })
 
   it('has accessible PDF content', () => {
-    render(<Page />)
+    const { container } = render(<Page />)
     // Add more specific assertions based on your actual page content
     // This is a placeholder test
-    expect(document.body).not.toBeEmptyDOMElement()
+    expect(container.innerHTML).toBeTruthy()
   })
 })

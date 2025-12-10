@@ -54,8 +54,8 @@ just help
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) - System design and data flow
-- [MVP Roadmap](docs/MVP_ROADMAP.md) - Path to functional prototype
 - [Development Guide](docs/DEVELOPMENT.md) - Setup and workflows
+- [MVP Roadmap](docs/MVP_ROADMAP.md) - Path to functional prototype
 - [System Design](docs/SYSTEM_DESIGN.md) - Technical decisions
 
 ## MVP Progress

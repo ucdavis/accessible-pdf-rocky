@@ -622,37 +622,40 @@ These layers handle the **same domain** (OCR, WCAG, PDF) but at **different stag
 
 #### Complete Processing Flow
 
-```
-┌────────────────────────────┐
-│ Controller (Lightweight)     │
-└────────────┬───────────────┘
-             │
-  1. pdf_normalizer.detect_pdf_type()
-  2. ocr_engine decides: "Needs OCR"
-  3. Submit SLURM job
-             │
-             ↓
-┌────────────┴──────────────┐
-│ HPC GPU Nodes (Heavy ML)     │
-│                              │
-│  4. runner.py orchestrates:  │
-│     a. processors/ocr.py     │  ← Runs Tesseract
-│     b. ai/layout inference   │  ← LayoutLMv3 on GPU
-│     c. ai/alt_text inference │  ← BLIP-2 on GPU
-│     d. processors/wcag       │  ← Validates predictions
-│     e. processors/tagging    │  ← Adds semantic tags
-│                              │
-└────────────┬──────────────┘
-             │
-             ↓
-┌────────────┴──────────────┐
-│ Controller (Lightweight)     │
-│                              │
-│  5. Retrieve HPC results     │
-│  6. wcag_engine final check  │  ← Rule-based validation
-│  7. pdf_builder assembly     │  ← Build final PDF
-│  8. Upload to R2             │
-└────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph C1["Controller (Lightweight)"]
+        A1["1. pdf_normalizer.detect_pdf_type()"]
+        A2["2. ocr_engine decides: 'Needs OCR'"]
+        A3["3. Submit SLURM job"]
+        A1 --> A2 --> A3
+    end
+    
+    A3 --> B0
+    
+    subgraph HPC["HPC GPU Nodes (Heavy ML)"]
+        B0["4. runner.py orchestrates:"]
+        B1["a. processors/ocr.py<br/><i>Runs Tesseract</i>"]
+        B2["b. ai/layout inference<br/><i>LayoutLMv3 on GPU</i>"]
+        B3["c. ai/alt_text inference<br/><i>BLIP-2 on GPU</i>"]
+        B4["d. processors/wcag<br/><i>Validates predictions</i>"]
+        B5["e. processors/tagging<br/><i>Adds semantic tags</i>"]
+        B0 --> B1 --> B2 --> B3 --> B4 --> B5
+    end
+    
+    B5 --> C0
+    
+    subgraph C2["Controller (Lightweight)"]
+        C0["5. Retrieve HPC results"]
+        C1a["6. wcag_engine final check<br/><i>Rule-based validation</i>"]
+        C2a["7. pdf_builder assembly<br/><i>Build final PDF</i>"]
+        C3["8. Upload to R2"]
+        C0 --> C1a --> C2a --> C3
+    end
+    
+    style C1 fill:#d4edda
+    style HPC fill:#f8d7da
+    style C2 fill:#d4edda
 ```
 
 **Summary:** Same domain, different stages. Controller coordinates and makes decisions. HPC does the heavy lifting. Controller validates and assembles the final output.
