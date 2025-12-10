@@ -7,6 +7,20 @@ Production-grade accessible PDF system with Cloudflare Workers, FastAPI, and HPC
 🚧 **Current Phase**: Project Scaffold  
 🎯 **Next**: MVP Development ([see roadmap](docs/MVP_ROADMAP.md))
 
+## Why Use This?
+
+This project aims to automate PDF accessibility remediation using modern AI models. The goal is to:
+
+- **Modern AI**: Uses LayoutLMv3, BLIP-2, and other state-of-the-art models for document understanding and alt-text generation
+- **Batch Processing**: Enable processing of large document collections without manual review
+- **Cost Efficient**: Leverage existing HPC infrastructure for cost-effective processing
+- **Deployment Flexibility**: Cloud, hybrid, or fully on-premise with HPC integration
+- **WCAG 2.1 AA Compliance**: Automated enforcement, not just checking
+
+Designed for UC Davis document remediation needs.
+
+**[Learn more about the rationale →](docs/WHY.md)**
+
 ## Repository Structure
 
 - `frontend/` – Next.js UI (Cloudflare Pages)

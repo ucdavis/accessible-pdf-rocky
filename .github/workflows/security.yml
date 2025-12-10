@@ -1,0 +1,57 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday at midnight UTC
+
+jobs:
+  npm-audit:
+    name: NPM Security Audit
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        directory: [frontend, workers]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Run npm audit
+        working-directory: ./${{ matrix.directory }}
+        run: |
+          npm audit --audit-level=moderate
+        continue-on-error: true
+
+  python-audit:
+    name: Python Security Audit
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        directory: [controller, hpc_runner]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      
+      - name: Set up Python
+        run: uv python install
+        working-directory: ./${{ matrix.directory }}
+      
+      - name: Install dependencies
+        working-directory: ./${{ matrix.directory }}
+        run: uv sync
+      
+      - name: Run safety check
+        working-directory: ./${{ matrix.directory }}
+        run: |
+          uv pip install safety
+          uv run safety check --json
+        continue-on-error: true
