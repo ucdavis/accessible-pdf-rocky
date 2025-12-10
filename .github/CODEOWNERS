@@ -1,0 +1,30 @@
+# CODEOWNERS file for accessible-pdf-rocky
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+* @acgetchell @srkirkland
+
+# Documentation
+/docs/ @acgetchell @srkirkland
+*.md @acgetchell @srkirkland
+
+# Python components
+/controller/ @acgetchell @srkirkland
+/hpc_runner/ @acgetchell @srkirkland
+
+# Frontend
+/frontend/ @acgetchell @srkirkland
+
+# Cloudflare Workers
+/workers/ @acgetchell @srkirkland
+
+# Infrastructure and CI/CD
+/.github/ @acgetchell @srkirkland
+/docker-compose.yml @acgetchell @srkirkland
+/justfile @acgetchell @srkirkland
+
+# Configuration files
+*.toml @acgetchell @srkirkland
+*.json @acgetchell @srkirkland
+*.yml @acgetchell @srkirkland
+*.yaml @acgetchell @srkirkland

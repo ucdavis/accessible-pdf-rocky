@@ -10,6 +10,9 @@ dist/
 out/
 .cache/
 coverage/
+htmlcov/
+.coverage
+coverage.xml
 *.tsbuildinfo
 .wrangler/
 

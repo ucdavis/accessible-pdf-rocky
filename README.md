@@ -53,6 +53,7 @@ just dev
 Track development: [MVP v0.1 Milestone](https://github.com/ucdavis/accessible-pdf-rocky/milestone/1)
 
 10 issues across 5 phases:
+
 1. Infrastructure (R2, Queue, Database)
 2. Backend (Controller, SLURM)
 3. Processing (Mock PDF analysis)

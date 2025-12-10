@@ -223,6 +223,9 @@ action-lint:
 # Run all tests
 test: test-python test-js
 
+# Run tests with coverage
+test-coverage: test-python-coverage test-js-coverage
+
 # Python tests
 test-python: _ensure-uv
     #!/usr/bin/env bash
@@ -236,6 +239,19 @@ test-python: _ensure-uv
         cd hpc_runner && uv run pytest && cd ..
     fi
 
+# Python tests with coverage
+test-python-coverage: _ensure-uv
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -d "controller" ] && [ -f "controller/pyproject.toml" ]; then
+        echo "Testing controller with coverage..."
+        cd controller && uv run pytest --cov=. --cov-report=html --cov-report=term && cd ..
+    fi
+    if [ -d "hpc_runner" ] && [ -f "hpc_runner/pyproject.toml" ]; then
+        echo "Testing hpc_runner with coverage..."
+        cd hpc_runner && uv run pytest --cov=. --cov-report=html --cov-report=term && cd ..
+    fi
+
 # JavaScript tests
 test-js: _ensure-npm
     #!/usr/bin/env bash
@@ -247,6 +263,19 @@ test-js: _ensure-npm
     if [ -d "workers" ] && [ -f "workers/package.json" ]; then
         echo "Testing workers..."
         cd workers && npm test && cd ..
+    fi
+
+# JavaScript tests with coverage
+test-js-coverage: _ensure-npm
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
+        echo "Testing frontend with coverage..."
+        cd frontend && npm run test:coverage && cd ..
+    fi
+    if [ -d "workers" ] && [ -f "workers/package.json" ]; then
+        echo "Testing workers with coverage..."
+        cd workers && npm run test:coverage && cd ..
     fi
 
 # Development with Docker Compose
