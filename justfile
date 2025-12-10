@@ -315,13 +315,13 @@ dev-controller: _ensure-uv
 dev-workers: _ensure-npm
     cd workers && npm run dev
 
-# CI simulation: quality checks with comprehensive testing
+# CI simulation: quality checks with comprehensive testing (fast, matches GitHub Actions)
 ci: lint test
     @echo "🎯 CI simulation complete!"
 
-# Pre-commit workflow: comprehensive validation before committing
-# Runs: linting + all tests
-commit-check: lint test
+# Pre-commit workflow: comprehensive validation with coverage before committing
+# Runs: linting + all tests with coverage reports
+commit-check: lint test-coverage
     @echo "🚀 Ready to commit! All checks passed!"
 
 # Type checking
