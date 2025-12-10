@@ -7,9 +7,9 @@
 #SBATCH --error=slurm-%j.err
 
 # Change to hpc_runner directory
-cd $HOME/accessible-pdf-rocky/hpc_runner
+cd "$HOME"/accessible-pdf-rocky/hpc_runner || exit 1
 
 # Run using uv
-uv run runner.py $PDF_PATH \
-  --job-id $JOB_ID \
-  --output results/${JOB_ID}.json
+uv run runner.py "$PDF_PATH" \
+	--job-id "$JOB_ID" \
+	--output results/"${JOB_ID}".json

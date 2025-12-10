@@ -60,46 +60,26 @@ Output flows back to:
 
 ## System Diagram
 
-```text
-                    ┌──────────────────────────────────┐
-                    │        Next.js Frontend           │
-                    │      (Cloudflare Pages)           │
-                    └──────────────────▲────────────────┘
-                                       │ HTTPS
-                                       │
-                    ┌──────────────────┴───────────────────┐
-                    │         Cloudflare Worker API         │
-                    │  - PDF Upload                         │
-                    │  - R2 Put                             │
-                    │  - Job Submit to Queue                │
-                    └───────────────┬──────────────────────┘
-                                    │
-                          ┌─────────▼──────────┐
-                          │   Cloudflare Queue  │
-                          │ job messages        │
-                          └─────────┬──────────┘
-                                    │ dequeues
-                    ┌───────────────▼────────────────┐
-                    │      FastAPI Controller         │
-                    │ - Pull Queue Jobs               │
-                    │ - Submit SLURM Jobs             │
-                    │ - Monitor SLURM via sacct/squeue│
-                    │ - Upload results to R2          │
-                    └───────────────┬────────────────┘
-                                    │
-                          ┌─────────▼───────────────┐
-                          │   HPC Cluster (SLURM)    │
-                          │   GPU Nodes run heavy ML │
-                          │  - Layout detection       │
-                          │  - Alt-text models        │
-                          │  - WCAG enforcement       │
-                          │  - PDF tagging            │
-                          └─────────┬────────────────┘
-                                    │ output
-                    ┌───────────────▼────────────────┐
-                    │            R2 Storage           │
-                    │ accessible PDFs, reports, JSON  │
-                    └─────────────────────────────────┘
+```mermaid
+flowchart TD
+    Frontend["Next.js Frontend<br/>(Cloudflare Pages)"] -->|HTTPS| Workers
+    
+    Workers["Cloudflare Worker API<br/>• PDF Upload<br/>• R2 Put<br/>• Job Submit to Queue"] --> Queue
+    
+    Queue["Cloudflare Queue<br/>(job messages)"] -->|dequeues| Controller
+    
+    Controller["FastAPI Controller<br/>• Pull Queue Jobs<br/>• Submit SLURM Jobs<br/>• Monitor sacct/squeue<br/>• Upload results to R2"] --> HPC
+    
+    HPC["HPC Cluster SLURM<br/>GPU Nodes run heavy ML<br/>• Layout detection<br/>• Alt-text models<br/>• WCAG enforcement<br/>• PDF tagging"] -->|output| R2
+    
+    R2["R2 Storage<br/>accessible PDFs, reports, JSON"]
+    
+    style Frontend fill:#e1f5ff
+    style Workers fill:#e1f5ff
+    style Queue fill:#e1f5ff
+    style Controller fill:#d4edda
+    style HPC fill:#f8d7da
+    style R2 fill:#e1f5ff
 ```
 
 ## Repository Structure
@@ -107,21 +87,11 @@ Output flows back to:
 ```text
 accessible-pdf-rocky/
 │
-├── frontend/                 # Next.js on Cloudflare Pages
-│   ├── src/
-│   │   └── app/
-│   │       ├── page.tsx
-│   │       ├── upload/
-│   │       └── layout.tsx
-│   └── package.json
-│
-├── workers/                  # Cloudflare Workers
-│   ├── api/
-│   │   ├── upload.ts
-│   │   ├── submit-job.ts
-│   │   └── job-status.ts
-│   ├── wrangler.toml
-│   └── package.json
+├── .github/
+│   └── workflows/           # CI/CD workflows
+│       ├── ci.yml
+│       ├── codeql.yml
+│       └── security.yml
 │
 ├── controller/               # FastAPI bridge service
 │   ├── main.py
@@ -141,14 +111,88 @@ accessible-pdf-rocky/
 │   │   └── result_handler.py
 │   └── pyproject.toml
 │
-├── hpc_runner/               # Script executed on HPC compute nodes
-│   ├── runner.py
-│   ├── processors/
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── DEVELOPMENT.md
+│   ├── MVP_ROADMAP.md
+│   ├── SYSTEM_DESIGN.md
+│   ├── TESTING.md
+│   └── WHY.md
+│
+├── frontend/                 # Next.js on Cloudflare Pages
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── page.tsx           # Home page
+│   │   │   ├── layout.tsx         # Root layout
+│   │   │   ├── upload/
+│   │   │   │   └── page.tsx       # PDF upload UI
+│   │   │   └── jobs/
+│   │   │       ├── page.tsx       # Jobs list
+│   │   │       └── [id]/
+│   │   │           └── page.tsx   # Job details
+│   │   ├── components/
+│   │   │   ├── UploadForm.tsx     # Upload component
+│   │   │   └── JobStatusBadge.tsx # Status badge
+│   │   └── lib/
+│   │       └── api.ts             # API client
+│   └── package.json
+│
+├── hpc_runner/               # HPC compute jobs (heavy ML processing)
+│   ├── runner.py             # Main SLURM job script
+│   ├── processors/           # ML processing modules
+│   │   ├── __init__.py
+│   │   ├── layout.py         # Layout detection (LayoutLMv3/Donut)
+│   │   ├── alttext.py        # Alt-text generation (BLIP-2/LLaVA)
+│   │   ├── ocr.py            # OCR (Tesseract/PaddleOCR)
+│   │   ├── wcag.py           # WCAG compliance checking
+│   │   └── tagging.py        # PDF tagging (PyMuPDF/iText)
 │   └── pyproject.toml
 │
-└── docs/
-    └── ARCHITECTURE.md
+├── workers/                  # Cloudflare Workers (edge API endpoints)
+│   ├── api/
+│   │   ├── upload.ts         # PDF upload to R2
+│   │   ├── submit-job.ts     # Job submission to queue
+│   │   └── job-status.ts     # Status query proxy
+│   ├── wrangler.toml
+│   └── package.json
+│
+├── .gitignore
+├── .markdownlint.json
+├── cspell.json
+├── docker-compose.yml
+├── justfile
+└── README.md
 ```
+
+### Component Clarification: workers/ vs hpc_runner/
+
+**Important**: "workers" refers to Cloudflare Workers, not compute workers!
+
+#### workers/ - Cloudflare Workers (Edge API)
+
+- **Runtime**: Cloudflare's global edge network
+- **Language**: TypeScript
+- **Purpose**: Lightweight HTTP endpoints (~10-50ms)
+- **Resources**: Minimal CPU/memory, no GPU
+- **Responsibilities**:
+  - Handle PDF uploads → R2
+  - Submit jobs → Cloudflare Queue
+  - Proxy status queries → FastAPI
+
+#### hpc_runner/ - HPC Compute Jobs (Heavy ML)
+
+- **Runtime**: University HPC cluster via SLURM
+- **Language**: Python
+- **Purpose**: GPU-intensive ML processing (minutes to hours)
+- **Resources**: GPU nodes (A100/H100), 10s of GB RAM
+- **Responsibilities**:
+  - Layout detection (LayoutLMv3 - GPU intensive)
+  - Alt-text generation (BLIP-2/LLaVA - GPU intensive)
+  - OCR (Tesseract/PaddleOCR)
+  - WCAG compliance checking
+  - PDF tagging and remediation
+
+**Flow**: Frontend → Cloudflare Workers (fast API) → Queue → Controller → SLURM → HPC Runner (heavy ML on GPU) → Results → R2
 
 ## Data Flow
 
