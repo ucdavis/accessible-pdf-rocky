@@ -1,0 +1,67 @@
+codecov:
+  require_ci_to_pass: true
+  notify:
+    wait_for_ci: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "50...100"
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+        informational: false
+    patch:
+      default:
+        target: auto
+        threshold: 1%
+        informational: false
+
+flags:
+  controller:
+    paths:
+      - controller/
+    carryforward: false
+
+  hpc_runner:
+    paths:
+      - hpc_runner/
+    carryforward: false
+
+  frontend:
+    paths:
+      - frontend/src/
+    carryforward: false
+
+  workers:
+    paths:
+      - workers/src/
+    carryforward: false
+
+component_management:
+  individual_components:
+    - component_id: controller
+      name: Controller
+      paths:
+        - controller/**
+    - component_id: hpc_runner
+      name: HPC Runner
+      paths:
+        - hpc_runner/**
+    - component_id: frontend
+      name: Frontend
+      paths:
+        - frontend/**
+    - component_id: workers
+      name: Workers
+      paths:
+        - workers/**
+
+comment:
+  layout: "header, diff, flags, components, footer"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true

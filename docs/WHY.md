@@ -225,7 +225,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for infrastructure details.
 - Continuous improvement from human corrections
 - Active learning pipeline
 
-### 5. Cost Efficiency at Scale
+### 5. Cost Efficiency at Scale (estimated)
 
 **Adobe pricing:** Per-document fees ($50-200/doc)
 
@@ -266,34 +266,6 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for infrastructure details.
 - Human override capability
 - Training data provenance
 
-## Target Use Cases
-
-### Universities & Educational Institutions
-
-**Problem:** Thousands of legacy PDFs, limited budget, legal mandates
-
-**Solution:** Batch process entire libraries, fine-tune on academic papers
-
-**Example:** UC system has 500K+ PDFs to remediate, Adobe cost would be $25M-100M
-
-### Government Agencies
-
-**Problem:** Section 508 compliance, air-gapped environments, procurement requirements
-
-**Solution:** On-premise deployment, HPC integration, full data sovereignty
-
-### Publishers
-
-**Problem:** Scalable workflow for new content, consistent quality
-
-**Solution:** API integration, automated pipeline, custom models for publisher style
-
-### Healthcare & Legal
-
-**Problem:** HIPAA/confidentiality, specialized terminology, complex tables
-
-**Solution:** Private deployment, domain-specific fine-tuning, secure processing
-
 ## Technical Advantages
 
 ### 1. Spatial Document Understanding
@@ -306,7 +278,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for infrastructure details.
 
 **Problem:** Adobe often gets reading order wrong in complex layouts
 
-**Solution:** Fine-tuned sequence prediction model with 98%+ accuracy
+**Solution:** Fine-tuned sequence prediction model with high accuracy
 
 ### 3. Meaningful Alt-Text
 
@@ -334,7 +306,7 @@ LayoutLMv3, BLIP-2, LLaVA are open-source and production-ready (2023-2024).
 
 ### 2. Compute Accessibility
 
-Universities already have HPC clusters with idle GPU capacity.
+We already have HPC clusters with idle GPU capacity. Buying cloud GPU is expensive.
 
 ### 3. Legal Pressure
 

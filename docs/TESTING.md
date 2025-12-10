@@ -7,7 +7,7 @@ This document describes the testing infrastructure and best practices for the pr
 The project uses a comprehensive testing strategy with:
 
 - **Python**: pytest with coverage tracking
-- **JavaScript/TypeScript**: Jest (frontend) and Vitest (workers)
+- **JavaScript/TypeScript**: Vitest for all frontend and worker tests
 - **CI/CD**: GitHub Actions for automated testing
 - **Coverage**: Codecov integration for coverage reports
 
@@ -76,20 +76,20 @@ hpc_runner/
 - Use fixtures for setup/teardown
 - Use `pytest.mark` for categorization
 
-### Frontend (Next.js + Jest)
+### Frontend (Next.js + Vitest)
 
 ```
 frontend/
 ├── src/app/__tests__/
 │   └── page.test.tsx          # Component tests
-├── jest.config.js             # Jest configuration
-└── jest.setup.js              # Test setup
+├── vitest.config.ts           # Vitest configuration
+└── vitest.setup.ts            # Test setup
 ```
 
 **Conventions:**
 
 - Test files: `*.test.tsx` or `*.spec.tsx`
-- Use React Testing Library
+- Use Vitest with React Testing Library
 - Test user interactions, not implementation
 
 ### Workers (Vitest)
@@ -244,16 +244,11 @@ npm test -- -u
 
 ### JavaScript/TypeScript Dependencies
 
-#### Frontend
-
-- `jest` - Test framework
-- `@testing-library/react` - React testing utilities
-- `@testing-library/jest-dom` - DOM matchers
-
-#### Workers
+#### Frontend & Workers
 
 - `vitest` - Fast test framework
-- `@vitest/coverage-v8` - Coverage reporter
+- `@testing-library/react` - React testing utilities (frontend)
+- `jsdom` - DOM environment for tests
 
 ## Continuous Improvement
 
@@ -276,16 +271,15 @@ npm test -- -u
 - Check module structure and `__init__.py` files
 - Ensure dependencies are installed
 
-### Jest configuration issues
+### Vitest configuration issues
 
-- Clear cache: `npm test -- --clearCache`
-- Check `jest.config.js` and `jest.setup.js`
-- Verify Next.js compatibility
+- Clear cache: `npx vitest --clearCache`
+- Check `vitest.config.ts` and `vitest.setup.ts`
+- Verify Vite/Next.js compatibility
 
 ## Resources
 
 - [pytest documentation](https://docs.pytest.org/)
-- [Jest documentation](https://jestjs.io/)
 - [Vitest documentation](https://vitest.dev/)
 - [Testing Library](https://testing-library.com/)
 - [FastAPI testing](https://fastapi.tiangolo.com/tutorial/testing/)

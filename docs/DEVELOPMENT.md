@@ -6,16 +6,34 @@ This guide explains how to set up and run the accessible-pdf-rocky system locall
 
 ### Production (Full Stack)
 
-```
-User → Cloudflare Pages → Workers → R2 + Queues → FastAPI → SLURM/HPC → R2
+```mermaid
+flowchart LR
+    A[User] --> B[Cloudflare Pages]
+    B --> C[Workers]
+    C --> D[R2 + Queues]
+    D --> E[FastAPI]
+    E --> F[SLURM/HPC]
+    F --> G[R2]
+    
+    style B fill:#e1f5ff
+    style C fill:#e1f5ff
+    style D fill:#e1f5ff
+    style E fill:#d4edda
+    style F fill:#f8d7da
+    style G fill:#e1f5ff
 ```
 
 ### Local Development (Simplified)
 
-```
-User → Next.js (localhost:3000) → FastAPI (localhost:8000) → Local FS
-                                  ↓
-                               Postgres (localhost:5432)
+```mermaid
+flowchart LR
+    A[User] --> B[Next.js<br/>localhost:3000]
+    B --> C[FastAPI<br/>localhost:8000]
+    C --> D[Local FS]
+    C --> E[Postgres<br/>localhost:5432]
+    
+    style B fill:#e1f5ff
+    style C fill:#d4edda
 ```
 
 **Key differences:**

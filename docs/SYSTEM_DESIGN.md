@@ -622,45 +622,54 @@ These layers handle the **same domain** (OCR, WCAG, PDF) but at **different stag
 
 #### Complete Processing Flow
 
-```
-┌────────────────────────────┐
-│ Controller (Lightweight)     │
-└────────────┬───────────────┘
-             │
-  1. pdf_normalizer.detect_pdf_type()
-  2. ocr_engine decides: "Needs OCR"
-  3. Submit SLURM job
-             │
-             ↓
-┌────────────┴──────────────┐
-│ HPC GPU Nodes (Heavy ML)     │
-│                              │
-│  4. runner.py orchestrates:  │
-│     a. processors/ocr.py     │  ← Runs Tesseract
-│     b. ai/layout inference   │  ← LayoutLMv3 on GPU
-│     c. ai/alt_text inference │  ← BLIP-2 on GPU
-│     d. processors/wcag       │  ← Validates predictions
-│     e. processors/tagging    │  ← Adds semantic tags
-│                              │
-└────────────┬──────────────┘
-             │
-             ↓
-┌────────────┴──────────────┐
-│ Controller (Lightweight)     │
-│                              │
-│  5. Retrieve HPC results     │
-│  6. wcag_engine final check  │  ← Rule-based validation
-│  7. pdf_builder assembly     │  ← Build final PDF
-│  8. Upload to R2             │
-└────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph C1["Controller (Lightweight)"]
+        A1["1. pdf_normalizer.detect_pdf_type()"]
+        A2["2. ocr_engine decides: 'Needs OCR'"]
+        A3["3. Submit SLURM job"]
+        A1 --> A2 --> A3
+    end
+    
+    A3 --> B0
+    
+    subgraph HPC["HPC GPU Nodes (Heavy ML)"]
+        B0["4. runner.py orchestrates:"]
+        B1["a. processors/ocr.py<br/><i>Runs Tesseract</i>"]
+        B2["b. ai/layout inference<br/><i>LayoutLMv3 on GPU</i>"]
+        B3["c. ai/alt_text inference<br/><i>BLIP-2 on GPU</i>"]
+        B4["d. processors/wcag<br/><i>Validates predictions</i>"]
+        B5["e. processors/tagging<br/><i>Adds semantic tags</i>"]
+        B0 --> B1 --> B2 --> B3 --> B4 --> B5
+    end
+    
+    B5 --> C0
+    
+    subgraph C2["Controller (Lightweight)"]
+        C0["5. Retrieve HPC results"]
+        C1a["6. wcag_engine final check<br/><i>Rule-based validation</i>"]
+        C2a["7. pdf_builder assembly<br/><i>Build final PDF</i>"]
+        C3["8. Upload to R2"]
+        C0 --> C1a --> C2a --> C3
+    end
+    
+    style C1 fill:#d4edda
+    style HPC fill:#f8d7da
+    style C2 fill:#d4edda
 ```
 
 **Summary:** Same domain, different stages. Controller coordinates and makes decisions. HPC does the heavy lifting. Controller validates and assembles the final output.
 
 ## Frontend Features
 
+### Authentication
+
+- **Required:** UC Davis campus account login via EntraID (Microsoft Azure AD)
+- All features require authenticated session
+
 ### Pages
 
+- `/` - Landing page (login redirect if unauthenticated)
 - `/upload` - PDF upload with drag-and-drop
 - `/documents/[id]` - Document dashboard
 - `/documents/[id]/review` - Accessibility review editor
@@ -795,6 +804,16 @@ CREATE TABLE alt_texts (
 /reports/{job_id}/compliance.json   # WCAG report
 ```
 
+### Optional Box Integration
+
+**Future Feature:** Automatic upload of results to user's Box folder
+
+- OAuth integration with Box API
+- User grants permission to write to their Box account
+- Results automatically saved to `/Accessible PDFs/{job_id}/`
+- User maintains full control via Box sharing and permissions
+- Falls back to R2 download if Box integration not enabled
+
 ## Model Training Pipeline
 
 ### 1. Dataset Preparation
@@ -844,11 +863,14 @@ python scripts/benchmark.py \
 
 ## Security & Privacy
 
+- **Authentication** - UC Davis campus account required (EntraID/Azure AD integration)
+- **Authorization** - Users can only access their own jobs and results
 - **PDF sanitization** - Remove embedded scripts, forms, JavaScript
 - **Content isolation** - Each job in separate container
 - **PII detection** - Flag sensitive content (SSN, credit cards)
 - **Access control** - Signed URLs with expiration
 - **Audit logging** - All AI decisions logged for review
+- **Box integration** - Optional, user-controlled OAuth with write permissions
 
 ## Future Enhancements
 

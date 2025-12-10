@@ -153,7 +153,7 @@ help:
     @echo "  just lint          # All linting (code + docs + config)"
     @echo "  just lint-code     # Code linting (Python, JavaScript, Shell)"
     @echo "  just lint-docs     # Documentation linting (Markdown, Spelling)"
-    @echo "  just lint-config   # Configuration validation (JSON, Actions)"
+    @echo "  just lint-config   # Configuration validation (JSON, YAML, Actions)"
     @echo ""
     @echo "Security:"
     @echo "  just audit         # Check for vulnerabilities in dependencies"
@@ -192,8 +192,8 @@ lint: lint-code lint-docs lint-config
 # Code linting: Python + JavaScript + Shell
 lint-code: python-lint js-lint shell-lint
 
-# Configuration validation: JSON, GitHub Actions workflows
-lint-config: validate-json action-lint
+# Configuration validation: JSON, YAML, GitHub Actions workflows
+lint-config: validate-json validate-yaml action-lint
 
 # Documentation linting: Markdown + spell checking
 lint-docs: markdown-lint spell-check
@@ -406,6 +406,25 @@ typecheck: _ensure-npm
     if [ -d "workers" ]; then
         echo "Type checking workers..."
         cd workers && npx tsc --noEmit && cd ..
+    fi
+
+# Validate YAML files
+validate-yaml: _ensure-uv
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! uv run yamllint --version >/dev/null 2>&1; then
+        echo "⚠️ 'yamllint' not found in uv environment, skipping YAML validation"
+        echo "   Install: uv tool install yamllint"
+        exit 0
+    fi
+    files=()
+    while IFS= read -r -d '' file; do
+        files+=("$file")
+    done < <(git ls-files -z '*.yml' '*.yaml')
+    if [ "${#files[@]}" -gt 0 ]; then
+        printf '%s\0' "${files[@]}" | xargs -0 uv run yamllint -c .yamllint.yml
+    else
+        echo "No YAML files found to validate."
     fi
 
 # Validate JSON files

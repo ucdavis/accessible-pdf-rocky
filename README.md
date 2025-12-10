@@ -5,6 +5,7 @@ Production-grade accessible PDF system with Cloudflare Workers, FastAPI, and HPC
 [![CI](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/ci.yml/badge.svg)](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/codeql.yml/badge.svg)](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/codeql.yml)
 [![Security Audit](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/security.yml/badge.svg)](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/security.yml)
+[![codecov](https://codecov.io/gh/ucdavis/accessible-pdf-rocky/graph/badge.svg?token=2NJXW8VPKO)](https://codecov.io/gh/ucdavis/accessible-pdf-rocky)
 
 ## Status
 
@@ -54,9 +55,11 @@ just help
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) - System design and data flow
-- [MVP Roadmap](docs/MVP_ROADMAP.md) - Path to functional prototype
 - [Development Guide](docs/DEVELOPMENT.md) - Setup and workflows
+- [MVP Roadmap](docs/MVP_ROADMAP.md) - Path to functional prototype
 - [System Design](docs/SYSTEM_DESIGN.md) - Technical decisions
+- [Testing Strategy](docs/TESTING.md) - Test coverage and approach
+- [Why This Project?](docs/WHY.md) - Problem statement and rationale
 
 ## MVP Progress
 
