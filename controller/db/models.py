@@ -1,44 +1,69 @@
 """Database models for job tracking."""
 
-# TODO: Implement database models using SQLAlchemy or similar ORM
-# Required models:
-# - Job: track PDF processing jobs
-#   - id (UUID)
-#   - slurm_id (string)
-#   - status (enum: submitted, running, completed, failed)
-#   - r2_key (string)
-#   - created_at (timestamp)
-#   - updated_at (timestamp)
-#   - results_url (string, nullable)
-# - User: track users/organizations
-# - ProcessingMetrics: track processing statistics
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Optional
+from uuid import UUID, uuid4
+
+from sqlalchemy import Column, DateTime
+from sqlmodel import Field, SQLModel
 
 
-class Job:
-    """
-    Job model for tracking PDF processing.
-
-    TODO: Implement as SQLAlchemy model or Pydantic schema
-    """
-
-    pass
+def utc_now() -> datetime:
+    """Return current UTC time with timezone info."""
+    return datetime.now(timezone.utc)
 
 
-class User:
-    """
-    User model for authentication and tracking.
+class JobStatus(str, Enum):
+    """Job processing status."""
 
-    TODO: Implement user authentication model
-    """
+    SUBMITTED = "submitted"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
-    pass
+
+class Job(SQLModel, table=True):
+    """Job model for tracking PDF processing."""
+
+    __tablename__ = "jobs"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    slurm_id: Optional[str] = Field(default=None, index=True)
+    status: JobStatus = Field(default=JobStatus.SUBMITTED, index=True)
+    r2_key: str = Field(index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now),
+    )
+    results_url: Optional[str] = Field(default=None)
+    user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
 
 
-class ProcessingMetrics:
-    """
-    Processing metrics for monitoring and analytics.
+class User(SQLModel, table=True):
+    """User model for authentication and tracking."""
 
-    TODO: Implement metrics tracking
-    """
+    __tablename__ = "users"
 
-    pass
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    email: str = Field(unique=True, index=True)
+    name: Optional[str] = Field(default=None)
+    organization: Optional[str] = Field(default=None)
+    created_at: datetime = Field(default_factory=utc_now)
+    is_active: bool = Field(default=True)
+
+
+class ProcessingMetrics(SQLModel, table=True):
+    """Processing metrics for monitoring and analytics."""
+
+    __tablename__ = "processing_metrics"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    job_id: UUID = Field(foreign_key="jobs.id", index=True)
+    processing_time_seconds: Optional[float] = Field(default=None)
+    pdf_pages: Optional[int] = Field(default=None)
+    pdf_size_bytes: Optional[int] = Field(default=None)
+    success: bool = Field(default=False)
+    error_message: Optional[str] = Field(default=None)
+    created_at: datetime = Field(default_factory=utc_now)

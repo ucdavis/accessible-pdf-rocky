@@ -23,27 +23,105 @@ class TestDBModels:
         from db.models import Job
 
         assert Job is not None
-        # Verify Job can be instantiated (even if it's just a stub)
-        job = Job()
-        assert job is not None
+        # Verify Job is a valid SQLModel class
+        assert hasattr(Job, "__tablename__")
+        assert Job.__tablename__ == "jobs"
 
     def test_user_model_exists(self):
         """Test that User model class exists."""
         from db.models import User
 
         assert User is not None
-        # Verify User can be instantiated
-        user = User()
-        assert user is not None
+        # Verify User is a valid SQLModel class
+        assert hasattr(User, "__tablename__")
+        assert User.__tablename__ == "users"
 
     def test_processing_metrics_model_exists(self):
         """Test that ProcessingMetrics model class exists."""
         from db.models import ProcessingMetrics
 
         assert ProcessingMetrics is not None
-        # Verify ProcessingMetrics can be instantiated
-        metrics = ProcessingMetrics()
-        assert metrics is not None
+        # Verify ProcessingMetrics is a valid SQLModel class
+        assert hasattr(ProcessingMetrics, "__tablename__")
+        assert ProcessingMetrics.__tablename__ == "processing_metrics"
+
+    def test_utc_now_returns_timezone_aware_datetime(self):
+        """Test that utc_now() returns timezone-aware datetime in UTC."""
+        from datetime import timezone
+        from db.models import utc_now
+
+        result = utc_now()
+
+        # Should return a datetime object
+        assert result is not None
+        # Should be timezone-aware (not naive)
+        assert result.tzinfo is not None
+        # Should be in UTC timezone
+        assert result.tzinfo == timezone.utc
+
+    def test_job_model_fields_and_defaults(self):
+        """Test Job model field definitions and default values."""
+        from uuid import UUID
+        from db.models import Job, JobStatus
+
+        job = Job(r2_key="test/key.pdf")
+
+        # Check types and defaults
+        assert isinstance(job.id, UUID)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.r2_key == "test/key.pdf"
+        assert job.slurm_id is None
+        assert job.results_url is None
+        assert job.user_id is None
+        # Timestamps should be auto-populated
+        assert job.created_at is not None
+        assert job.updated_at is not None
+        # Timestamps should be timezone-aware
+        assert job.created_at.tzinfo is not None
+        assert job.updated_at.tzinfo is not None
+
+    def test_user_model_fields_and_defaults(self):
+        """Test User model field definitions and default values."""
+        from uuid import UUID
+        from db.models import User
+
+        user = User(email="test@example.com")
+
+        # Check types and defaults
+        assert isinstance(user.id, UUID)
+        assert user.email == "test@example.com"
+        assert user.name is None
+        assert user.organization is None
+        assert user.is_active is True
+        # Timestamp should be auto-populated
+        assert user.created_at is not None
+        # Timestamp should be timezone-aware
+        assert user.created_at.tzinfo is not None
+
+    def test_processing_metrics_model_fields_and_defaults(self):
+        """Test ProcessingMetrics model field definitions and default values."""
+        from uuid import UUID
+        from db.models import ProcessingMetrics
+
+        # Need a job_id UUID for the foreign key
+        from uuid import uuid4
+
+        job_id = uuid4()
+
+        metrics = ProcessingMetrics(job_id=job_id)
+
+        # Check types and defaults
+        assert isinstance(metrics.id, UUID)
+        assert metrics.job_id == job_id
+        assert metrics.processing_time_seconds is None
+        assert metrics.pdf_pages is None
+        assert metrics.pdf_size_bytes is None
+        assert metrics.success is False
+        assert metrics.error_message is None
+        # Timestamp should be auto-populated
+        assert metrics.created_at is not None
+        # Timestamp should be timezone-aware
+        assert metrics.created_at.tzinfo is not None
 
 
 class TestDBSession:
@@ -55,30 +133,39 @@ class TestDBSession:
 
         assert session is not None
 
-    def test_get_db_connection_exists(self):
-        """Test that get_db_connection function exists and is callable."""
-        from db.session import get_db_connection
+    def test_get_session_exists(self):
+        """Test that get_session function exists and is an async generator."""
+        from db.session import get_session
+        import inspect
 
-        # Currently unimplemented; ensure it is callable and does not raise
-        # TODO: Once implemented, this should return a database connection object
-        get_db_connection()
+        assert get_session is not None
+        assert inspect.isasyncgenfunction(get_session)
 
-    def test_db_session_exists(self):
-        """Test that db_session function exists and is callable."""
-        from db.session import db_session
+    def test_engine_created(self):
+        """Test that database engine is created with async driver."""
+        from db.session import engine
 
-        # Currently unimplemented; ensure it is callable and does not raise
-        # TODO: Once implemented, this should return a context manager
-        db_session()
+        assert engine is not None
+        assert hasattr(engine, "url")
+        # Verify using an async PostgreSQL driver (postgresql+asyncpg, postgresql+asyncpg_sa, etc.)
+        assert engine.url.drivername.startswith("postgresql+")
+        assert "async" in engine.url.drivername
+
+    def test_async_session_factory_created(self):
+        """Test that async session factory is created."""
+        from db.session import async_session
+
+        assert async_session is not None
+        assert callable(async_session)
 
     @pytest.mark.asyncio
     async def test_init_db_exists(self):
         """Test that init_db async function exists and is callable."""
         from db.session import init_db
+        import inspect
 
-        # Currently unimplemented; ensure it is callable and does not raise
-        # TODO: Once implemented, verify database initialization behavior
-        await init_db()
+        assert init_db is not None
+        assert inspect.iscoroutinefunction(init_db)
 
 
 class TestR2Download:
