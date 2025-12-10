@@ -29,10 +29,9 @@ Runs on a publicly accessible host:
 **Responsibilities:**
 
 - Pull jobs from Cloudflare Queues
+- Generate presigned R2 URLs for SLURM jobs
 - Create [SLURM](https://slurm.schedmd.com/) job submissions
 - Track job status
-- Fetch results from HPC
-- Upload outputs to R2
 - Update [Postgres](https://www.postgresql.org/)
 - Expose API to frontend
 
@@ -50,10 +49,11 @@ The FastAPI service bridges Cloudflare and the HPC cluster.
 
 Workers run on GPU nodes (A100/H100, etc.).
 
-Output flows back to:
+Output flows back to R2:
 
-- HPC scratch folder → retrieved by FastAPI
-- Or directly uploaded to R2 via endpoint
+- SLURM jobs download input PDFs directly from R2
+- SLURM jobs upload processed PDFs directly to R2
+- No file transfers through FastAPI controller
 
 ## System Diagram
 
@@ -65,9 +65,9 @@ flowchart TD
     
     Queue["Cloudflare Queue<br/>(job messages)"] -->|dequeues| Controller
     
-    Controller["FastAPI Controller<br/>• Pull Queue Jobs<br/>• Submit SLURM Jobs<br/>• Monitor sacct/squeue<br/>• Upload results to R2"] --> HPC
+    Controller["FastAPI Controller<br/>• Pull Queue Jobs<br/>• Generate R2 URLs<br/>• Submit SLURM Jobs<br/>• Monitor sacct/squeue"] --> HPC
     
-    HPC["HPC Cluster SLURM<br/>GPU Nodes run heavy ML<br/>• Layout detection<br/>• Alt-text models<br/>• WCAG enforcement<br/>• PDF tagging"] -->|output| R2
+    HPC["HPC Cluster SLURM<br/>GPU Nodes run heavy ML<br/>• Layout detection<br/>• Alt-text models<br/>• WCAG enforcement<br/>• PDF tagging"] <-->|download/upload| R2
     
     R2["R2 Storage<br/>accessible PDFs, reports, JSON"]
     
@@ -250,38 +250,38 @@ You'll notice some similar file names in both `controller/services/` and `hpc_ru
 
 ```mermaid
 flowchart TD
-    A["1. User uploads PDF"] --> B["2. Controller/services/pdf_normalizer<br/>detects PDF type"]
-    B --> C["3. Controller/services/ocr_engine<br/>decides: 'This needs OCR'"]
-    C --> D["4. Controller submits<br/>SLURM job to HPC"]
+    A["1. User uploads PDF to R2"] --> B["2. Controller receives job<br/>from Cloudflare Queue"]
+    B --> C["3. Controller generates<br/>presigned R2 URLs"]
+    C --> D["4. Controller submits<br/>SLURM job with URLs"]
     
-    D --> E["5. HPC runner.py starts:"]
+    D --> E["5. SLURM job starts:"]
     
-    E --> E1["a. hpc_runner/processors/ocr.py<br/>runs Tesseract (heavy)"]
-    E1 --> E2["b. hpc_runner/ai/layout<br/>runs LayoutLMv3 (heavy)"]
-    E2 --> E3["c. hpc_runner/processors/wcag<br/>validates predictions"]
-    E3 --> E4["d. hpc_runner/processors/tagging<br/>adds semantic tags"]
+    E --> E0["a. Download PDF from R2"]
+    E0 --> E1["b. hpc_runner/processors/ocr.py<br/>runs Tesseract (heavy)"]
+    E1 --> E2["c. hpc_runner/ai/layout<br/>runs LayoutLMv3 (heavy)"]
+    E2 --> E3["d. hpc_runner/processors/wcag<br/>validates predictions"]
+    E3 --> E4["e. hpc_runner/processors/tagging<br/>adds semantic tags"]
+    E4 --> E5["f. Upload result to R2"]
     
-    E4 --> F["6. Results return<br/>to controller"]
-    F --> G["7. Controller/services/wcag_engine<br/>final validation"]
-    G --> H["8. Controller/services/pdf_builder<br/>assembles output PDF"]
-    H --> I["9. Upload to R2"]
+    E5 --> F["6. Job completes"]
+    F --> G["7. Controller updates<br/>database status"]
     
     style A fill:#80d4ff,stroke:#0066cc,stroke-width:2px,color:#000
     style B fill:#90ee90,stroke:#228b22,stroke-width:2px,color:#000
     style C fill:#90ee90,stroke:#228b22,stroke-width:2px,color:#000
     style D fill:#90ee90,stroke:#228b22,stroke-width:2px,color:#000
     style E fill:#ff9999,stroke:#cc0000,stroke-width:2px,color:#000
+    style E0 fill:#ff9999,stroke:#cc0000,stroke-width:2px,color:#000
     style E1 fill:#ff9999,stroke:#cc0000,stroke-width:2px,color:#000
     style E2 fill:#ff9999,stroke:#cc0000,stroke-width:2px,color:#000
     style E3 fill:#ff9999,stroke:#cc0000,stroke-width:2px,color:#000
     style E4 fill:#ff9999,stroke:#cc0000,stroke-width:2px,color:#000
+    style E5 fill:#ff9999,stroke:#cc0000,stroke-width:2px,color:#000
     style F fill:#90ee90,stroke:#228b22,stroke-width:2px,color:#000
     style G fill:#90ee90,stroke:#228b22,stroke-width:2px,color:#000
-    style H fill:#90ee90,stroke:#228b22,stroke-width:2px,color:#000
-    style I fill:#80d4ff,stroke:#0066cc,stroke-width:2px,color:#000
 ```
 
-**Key Insight:** Controller services are lightweight orchestrators. HPC runners are heavy processors. Similar names, different purposes, different stages.
+**Key Insight:** Controller generates presigned URLs and orchestrates job submission. HPC jobs download inputs, perform all processing, and upload outputs directly to R2. No file transfers through the controller.
 
 ## Data Flow
 
@@ -317,6 +317,7 @@ export default {
 import asyncio
 from cloudflare_queue import CloudflareQueueConsumer
 from hpc.submit import submit_slurm_job
+from r2.presigned import generate_presigned_urls
 from db.session import db_session
 from db.models import Job
 
@@ -327,8 +328,13 @@ async def handle_job(message):
     job_id = message["jobId"]
     r2_key = message["r2Key"]
 
-    # Submit SLURM job
-    slurm_id = submit_slurm_job(job_id, r2_key)
+    # Generate presigned URLs for SLURM job
+    input_url = generate_presigned_urls(r2_key, operation="get", expires=3600)
+    output_key = f"outputs/{job_id}/accessible.pdf"
+    output_url = generate_presigned_urls(output_key, operation="put", expires=3600)
+
+    # Submit SLURM job with URLs
+    slurm_id = submit_slurm_job(job_id, input_url, output_url)
 
     # Save slurm_id in DB
     with db_session() as db:
@@ -347,13 +353,14 @@ consumer.run()
 import subprocess
 from pathlib import Path
 
-def submit_slurm_job(job_id: str, pdf_path: str) -> str:
+def submit_slurm_job(job_id: str, input_url: str, output_url: str) -> str:
     """
     Submit a SLURM job for PDF accessibility analysis.
     
     Args:
         job_id: Unique job identifier
-        pdf_path: Path to the PDF file on the HPC filesystem
+        input_url: Presigned R2 URL to download input PDF
+        output_url: Presigned R2 URL to upload output PDF
         
     Returns:
         SLURM job ID as a string
@@ -363,7 +370,7 @@ def submit_slurm_job(job_id: str, pdf_path: str) -> str:
     cmd = [
         "sbatch",
         f"--job-name=wcag-{job_id}",
-        f"--export=ALL,JOB_ID={job_id},PDF_PATH={pdf_path}",
+        f"--export=ALL,JOB_ID={job_id},INPUT_URL={input_url},OUTPUT_URL={output_url}",
         str(script_path),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -384,13 +391,26 @@ def submit_slurm_job(job_id: str, pdf_path: str) -> str:
 #SBATCH --output=slurm-%j.out
 #SBATCH --error=slurm-%j.err
 
+# Set up temporary working directory
+WORK_DIR=$(mktemp -d)
+cd $WORK_DIR
+
+# Download PDF from R2 using presigned URL
+curl -o input.pdf "$INPUT_URL"
+
 # Change to hpc_runner directory
 cd $HOME/accessible-pdf-rocky/hpc_runner
 
 # Run using uv (https://docs.astral.sh/uv/)
-uv run runner.py $PDF_PATH \
+uv run runner.py $WORK_DIR/input.pdf \
   --job-id $JOB_ID \
-  --output results/${JOB_ID}.json
+  --output $WORK_DIR/output.pdf
+
+# Upload result to R2 using presigned URL
+curl -X PUT --upload-file $WORK_DIR/output.pdf "$OUTPUT_URL"
+
+# Cleanup
+rm -rf $WORK_DIR
 ```
 
 ### 5. HPC ML Runner (Heavy Processing)
@@ -519,12 +539,14 @@ export default {
 2. **Worker saves to R2**
 3. **Worker sends Queue message**
 4. **FastAPI listener pulls job**
-5. **FastAPI submits SLURM job**
-6. **SLURM runs ML inference** → produces accessible PDF
-7. **Script uploads accessible PDF to R2**
-8. **FastAPI updates database**
-9. **Frontend polls job status**
-10. **User downloads accessible PDF**
+5. **FastAPI generates presigned R2 URLs**
+6. **FastAPI submits SLURM job with URLs**
+7. **SLURM job downloads PDF from R2**
+8. **SLURM runs ML inference** → produces accessible PDF
+9. **SLURM job uploads result to R2**
+10. **FastAPI updates database**
+11. **Frontend polls job status**
+12. **User downloads accessible PDF from R2**
 
 ## Deployment Considerations
 
@@ -543,7 +565,8 @@ export default {
 - Deployed to HPC shared filesystem
 - Uses [uv](https://docs.astral.sh/uv/) for Python environment management
 - Requires GPU nodes for inference
-- Results stored in shared filesystem or uploaded to R2
+- **Requires internet access** to download/upload from R2
+- Uses presigned URLs (no permanent R2 credentials needed on HPC nodes)
 
 ### Scaling
 
@@ -556,9 +579,9 @@ export default {
 
 - **API Authentication**: Cloudflare Access or API tokens
 - **HPC Access**: SSH keys, no passwords
-- **R2 Credentials**: Environment variables, never in code
+- **R2 Credentials**: Presigned URLs (time-limited, single-use)
 - **Database**: Connection pooling, encrypted at rest
-- **PDFs**: Signed URLs for temporary access
+- **PDFs**: Presigned URLs for temporary access (1 hour expiry)
 
 ## Monitoring
 

@@ -569,7 +569,7 @@ This separation keeps ML model concerns separate from business logic and makes t
 
 These layers handle the **same domain** (OCR, WCAG, PDF) but at **different stages** with **different responsibilities**:
 
-**Pattern:** Controller decides/coordinates → HPC executes heavy work → Controller validates/assembles
+**Pattern:** Controller generates URLs and submits → HPC downloads, processes, and uploads → Controller updates status
 
 #### Detailed Overlap Explanation
 
@@ -577,10 +577,9 @@ These layers handle the **same domain** (OCR, WCAG, PDF) but at **different stag
 
 `controller/services/ocr_engine.py`:
 
-- Analyzes PDF type: "Is this scanned?"
-- Decides: "Should we run OCR? Which engine?"
-- Orchestrates: "Submit to HPC for OCR" or "Skip OCR"
-- Lightweight logic, no actual OCR
+- Can analyze PDF metadata before submission
+- Helps determine job parameters
+- Lightweight decision logic only
 
 `hpc_runner/processors/ocr.py`:
 
@@ -592,65 +591,58 @@ These layers handle the **same domain** (OCR, WCAG, PDF) but at **different stag
 
 `controller/services/wcag_engine.py`:
 
-- Final validation after HPC returns
-- "Are all requirements met?"
-- Rule-based checks on completed results
-- Builds final compliance report
+- May provide validation utilities for API responses
+- Helper functions for status reporting
 
 `hpc_runner/processors/wcag.py`:
 
 - Validates during ML processing
 - "Does this layout meet WCAG?"
 - Checks ML predictions against rules
-- Real-time validation as processing happens
+- Enforces compliance during PDF generation
 
 **3. PDF Operations**
 
 `controller/services/pdf_builder.py`:
 
-- Assembles final accessible PDF
-- Takes validated results and builds output
-- Adds final metadata
-- Lightweight PDF assembly
+- May provide utility functions
+- No longer builds final PDFs
 
 `hpc_runner/processors/tagging.py`:
 
 - Adds semantic tags during processing
 - Tags headings, paragraphs, figures
-- Structure annotations for accessibility
-- Heavy PDF manipulation with PyMuPDF
+- Builds complete accessible PDF
+- Heavy PDF manipulation with [PyMuPDF](https://pymupdf.readthedocs.io/)
 
 #### Complete Processing Flow
 
 ```mermaid
 flowchart TD
     subgraph C1["Controller (Lightweight)"]
-        A1["1. pdf_normalizer.detect_pdf_type()"]
-        A2["2. ocr_engine decides: 'Needs OCR'"]
-        A3["3. Submit SLURM job"]
+        A1["1. Receive job from Queue"]
+        A2["2. Generate presigned R2 URLs"]
+        A3["3. Submit SLURM job with URLs"]
         A1 --> A2 --> A3
     end
     
     A3 --> B0
     
     subgraph HPC["HPC GPU Nodes (Heavy ML)"]
-        B0["4. runner.py orchestrates:"]
-        B1["a. processors/ocr.py<br/><i>Runs Tesseract</i>"]
-        B2["b. ai/layout inference<br/><i>LayoutLMv3 on GPU</i>"]
-        B3["c. ai/alt_text inference<br/><i>BLIP-2 on GPU</i>"]
-        B4["d. processors/wcag<br/><i>Validates predictions</i>"]
-        B5["e. processors/tagging<br/><i>Adds semantic tags</i>"]
-        B0 --> B1 --> B2 --> B3 --> B4 --> B5
+        B0["4. Download PDF from R2"]
+        B1["5. processors/ocr.py<br/><i>Runs Tesseract</i>"]
+        B2["6. ai/layout inference<br/><i>LayoutLMv3 on GPU</i>"]
+        B3["7. ai/alt_text inference<br/><i>BLIP-2 on GPU</i>"]
+        B4["8. processors/wcag<br/><i>Validates predictions</i>"]
+        B5["9. processors/tagging<br/><i>Adds semantic tags</i>"]
+        B6["10. Upload result to R2"]
+        B0 --> B1 --> B2 --> B3 --> B4 --> B5 --> B6
     end
     
-    B5 --> C0
+    B6 --> C0
     
     subgraph C2["Controller (Lightweight)"]
-        C0["5. Retrieve HPC results"]
-        C1a["6. wcag_engine final check<br/><i>Rule-based validation</i>"]
-        C2a["7. pdf_builder assembly<br/><i>Build final PDF</i>"]
-        C3["8. Upload to R2"]
-        C0 --> C1a --> C2a --> C3
+        C0["11. Update database status"]
     end
     
     style C1 fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
@@ -658,7 +650,7 @@ flowchart TD
     style C2 fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
 ```
 
-**Summary:** Same domain, different stages. Controller coordinates and makes decisions. HPC does the heavy lifting. Controller validates and assembles the final output.
+**Summary:** Controller generates presigned URLs and submits jobs. HPC downloads input, performs all ML processing, and uploads results directly to R2. Controller only tracks job status and updates database.
 
 ## Frontend Features
 

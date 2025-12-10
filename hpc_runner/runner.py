@@ -7,10 +7,14 @@ This script is invoked by SLURM and orchestrates the ML pipeline:
 2. Run layout detection and reading order prediction
 3. Generate alt-text for images using vision-language models
 4. Parse table structures
-5. Output structured results to HPC scratch or R2
+5. Build accessible PDF with proper tagging
+6. Output is uploaded directly to R2 (not returned to controller)
+
+Note: The SLURM job script handles R2 download/upload.
+This script only processes the local PDF file passed as argument.
 
 This is the COMPUTE-HEAVY part that runs on GPU nodes.
-The controller/services/ layer orchestrates job submission and result retrieval.
+The controller only generates presigned URLs and tracks job status.
 """
 
 import argparse

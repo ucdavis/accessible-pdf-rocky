@@ -96,6 +96,7 @@
     "MiniGPT",
     "Miniflare",
     "mkdocs",
+    "mktemp",
     "multimodal",
     "mypy",
     "noheader",
