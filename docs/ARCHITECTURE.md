@@ -71,12 +71,12 @@ flowchart TD
     
     R2["R2 Storage<br/>accessible PDFs, reports, JSON"]
     
-    style Frontend fill:#e1f5ff
-    style Workers fill:#e1f5ff
-    style Queue fill:#e1f5ff
-    style Controller fill:#d4edda
-    style HPC fill:#f8d7da
-    style R2 fill:#e1f5ff
+    style Frontend fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
+    style Workers fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
+    style Queue fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
+    style Controller fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
+    style HPC fill:#ff9999,stroke:#cc0000,stroke-width:3px,color:#000
+    style R2 fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
 ```
 
 ## Repository Structure
@@ -266,19 +266,19 @@ flowchart TD
     G --> H["8. Controller/services/pdf_builder<br/>assembles output PDF"]
     H --> I["9. Upload to R2"]
     
-    style A fill:#e1f5ff
-    style B fill:#d4edda
-    style C fill:#d4edda
-    style D fill:#d4edda
-    style E fill:#f8d7da
-    style E1 fill:#f8d7da
-    style E2 fill:#f8d7da
-    style E3 fill:#f8d7da
-    style E4 fill:#f8d7da
-    style F fill:#d4edda
-    style G fill:#d4edda
-    style H fill:#d4edda
-    style I fill:#e1f5ff
+    style A fill:#80d4ff,stroke:#0066cc,stroke-width:2px,color:#000
+    style B fill:#90ee90,stroke:#228b22,stroke-width:2px,color:#000
+    style C fill:#90ee90,stroke:#228b22,stroke-width:2px,color:#000
+    style D fill:#90ee90,stroke:#228b22,stroke-width:2px,color:#000
+    style E fill:#ff9999,stroke:#cc0000,stroke-width:2px,color:#000
+    style E1 fill:#ff9999,stroke:#cc0000,stroke-width:2px,color:#000
+    style E2 fill:#ff9999,stroke:#cc0000,stroke-width:2px,color:#000
+    style E3 fill:#ff9999,stroke:#cc0000,stroke-width:2px,color:#000
+    style E4 fill:#ff9999,stroke:#cc0000,stroke-width:2px,color:#000
+    style F fill:#90ee90,stroke:#228b22,stroke-width:2px,color:#000
+    style G fill:#90ee90,stroke:#228b22,stroke-width:2px,color:#000
+    style H fill:#90ee90,stroke:#228b22,stroke-width:2px,color:#000
+    style I fill:#80d4ff,stroke:#0066cc,stroke-width:2px,color:#000
 ```
 
 **Key Insight:** Controller services are lightweight orchestrators. HPC runners are heavy processors. Similar names, different purposes, different stages.

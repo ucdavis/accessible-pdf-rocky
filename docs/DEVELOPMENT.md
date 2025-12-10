@@ -15,12 +15,12 @@ flowchart LR
     E --> F[SLURM/HPC]
     F --> G[R2]
     
-    style B fill:#e1f5ff
-    style C fill:#e1f5ff
-    style D fill:#e1f5ff
-    style E fill:#d4edda
-    style F fill:#f8d7da
-    style G fill:#e1f5ff
+    style B fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
+    style C fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
+    style D fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
+    style E fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
+    style F fill:#ff9999,stroke:#cc0000,stroke-width:3px,color:#000
+    style G fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
 ```
 
 ### Local Development (Simplified)
@@ -32,8 +32,8 @@ flowchart LR
     C --> D[Local FS]
     C --> E[Postgres<br/>localhost:5432]
     
-    style B fill:#e1f5ff
-    style C fill:#d4edda
+    style B fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
+    style C fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
 ```
 
 **Key differences:**

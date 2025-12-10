@@ -653,9 +653,9 @@ flowchart TD
         C0 --> C1a --> C2a --> C3
     end
     
-    style C1 fill:#d4edda
-    style HPC fill:#f8d7da
-    style C2 fill:#d4edda
+    style C1 fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
+    style HPC fill:#ff9999,stroke:#cc0000,stroke-width:3px,color:#000
+    style C2 fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
 ```
 
 **Summary:** Same domain, different stages. Controller coordinates and makes decisions. HPC does the heavy lifting. Controller validates and assembles the final output.
