@@ -1,49 +1,53 @@
 """Database session management."""
 
-# TODO: Implement database connection and session management
-# Options to consider:
-# - PostgreSQL via psycopg2/asyncpg
-# - SQLite for development
-# - Connection pooling
-# - Async session support
+import os
+from typing import AsyncGenerator
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlmodel import SQLModel
+
+# Get database URL from environment
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", "postgresql+asyncpg://dev:devpass@localhost:5432/accessible_pdf"
+)
+
+# Create async engine
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=True,  # Set to False in production
+    future=True,
+)
+
+# Create async session factory
+async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
-def get_db_connection():
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """
-    Get database connection.
+    Dependency for getting async database sessions.
 
-    TODO: Implement database connection with environment-based config
+    Example usage in FastAPI:
+        @app.get("/items")
+        async def get_items(session: AsyncSession = Depends(get_session)):
+            result = await session.execute(select(Item))
+            return result.scalars().all()
     """
-    # TODO: Read connection string from environment
-    # TODO: Implement connection pooling
-    # TODO: Add error handling and retries
-    pass
-
-
-def db_session():
-    """
-    Context manager for database sessions.
-
-    TODO: Implement session context manager
-
-    Example usage:
-        with db_session() as db:
-            job = Job(id=job_id, status="submitted")
-            db.add(job)
-            db.commit()
-    """
-    # TODO: Implement session creation and cleanup
-    # TODO: Handle transactions
-    # TODO: Implement rollback on error
-    pass
+    async with async_session() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
 
 
 async def init_db():
     """
     Initialize database schema.
 
-    TODO: Implement database initialization
-    - Create tables if not exist
-    - Run migrations
+    Creates all tables defined in SQLModel metadata.
     """
-    pass
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)

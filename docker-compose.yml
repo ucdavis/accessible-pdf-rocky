@@ -11,7 +11,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dev"]
+      test: ["CMD-SHELL", "pg_isready -U dev -d accessible_pdf"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -24,7 +24,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://dev:devpass@postgres:5432/accessible_pdf
+      DATABASE_URL: postgresql+asyncpg://dev:devpass@postgres:5432/accessible_pdf
       STORAGE_MODE: local  # local filesystem instead of R2
       STORAGE_PATH: /app/storage
       QUEUE_MODE: direct  # skip queue, process directly
@@ -34,7 +34,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: uv run uvicorn main:app --host ******* --port 8000 --reload
+    command: uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   # Next.js frontend
   frontend:
