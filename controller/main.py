@@ -33,13 +33,23 @@ async def get_status(job_id: UUID) -> Job:
     try:
         job_data = await db.get_job(job_id)
         # Convert timestamps from Unix seconds to datetime
+        # Use defensive handling in case timestamps are missing (shouldn't happen in practice)
+        now = datetime.now(timezone.utc)
         return Job(
             id=UUID(job_data["id"]),
             slurm_id=job_data.get("slurm_id"),
             status=JobStatus(job_data["status"]),
             r2_key=job_data["r2_key"],
-            created_at=datetime.fromtimestamp(job_data["created_at"], tz=timezone.utc),
-            updated_at=datetime.fromtimestamp(job_data["updated_at"], tz=timezone.utc),
+            created_at=(
+                datetime.fromtimestamp(job_data["created_at"], tz=timezone.utc)
+                if job_data.get("created_at") is not None
+                else now
+            ),
+            updated_at=(
+                datetime.fromtimestamp(job_data["updated_at"], tz=timezone.utc)
+                if job_data.get("updated_at") is not None
+                else now
+            ),
             results_url=job_data.get("results_url"),
             user_id=UUID(job_data["user_id"]) if job_data.get("user_id") else None,
             error=None,  # TODO: Add error tracking to database

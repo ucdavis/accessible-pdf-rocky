@@ -26,11 +26,17 @@ if [ -z "$SCRIPT" ]; then
 	exit 1
 fi
 
-# Canonicalize path to prevent traversal
-SCRIPT_REAL=$(realpath -m "$SCRIPT" 2>/dev/null) || {
-	echo "ERROR: Invalid path: $SCRIPT" >&2
+# Canonicalize path to prevent traversal (requires file to exist for full symlink resolution)
+SCRIPT_REAL=$(realpath "$SCRIPT" 2>/dev/null) || {
+	echo "ERROR: Invalid or non-existent path: $SCRIPT" >&2
 	exit 1
 }
+
+# Reject symlinks (prevents symlink attacks pointing outside allowed directory)
+if [ -L "$SCRIPT" ]; then
+	echo "ERROR: Symlinks not allowed: $SCRIPT" >&2
+	exit 1
+fi
 
 # Validate script is in allowed directory
 # CRITICAL: Only scripts in /home/slurm_submit/jobs/ can be submitted
@@ -45,9 +51,9 @@ case "$SCRIPT_REAL" in
 	;;
 esac
 
-# Validate script exists
+# Validate script is a regular file
 if [ ! -f "$SCRIPT_REAL" ]; then
-	echo "ERROR: Script does not exist: $SCRIPT_REAL" >&2
+	echo "ERROR: Not a regular file: $SCRIPT_REAL" >&2
 	exit 1
 fi
 

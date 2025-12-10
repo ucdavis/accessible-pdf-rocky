@@ -44,9 +44,9 @@ GPU_PENDING=$(squeue -t PENDING -p gpu -h 2>/dev/null | wc -l || echo 0)
 GPU_RUNNING=$(squeue -t RUNNING -p gpu -h 2>/dev/null | wc -l || echo 0)
 
 # Get node availability (optional)
-NODES_IDLE=$(sinfo -t idle -h 2>/dev/null | wc -l || echo 0)
-NODES_ALLOC=$(sinfo -t alloc -h 2>/dev/null | wc -l || echo 0)
-NODES_DOWN=$(sinfo -t down -h 2>/dev/null | wc -l || echo 0)
+NODES_IDLE=$(sinfo -N -t idle -h 2>/dev/null | wc -l || echo 0)
+NODES_ALLOC=$(sinfo -N -t alloc -h 2>/dev/null | wc -l || echo 0)
+NODES_DOWN=$(sinfo -N -t down -h 2>/dev/null | wc -l || echo 0)
 
 # Build JSON payload
 TIMESTAMP=$(date +%s)
@@ -81,8 +81,8 @@ HTTP_CODE=$(curl -X POST "${METRICS_ENDPOINT}" \
 	--write-out "%{http_code}" \
 	-o /dev/null 2>&1)
 
-# Check response
-if [ "${HTTP_CODE:-000}" -ne 200 ]; then
+# Check response (accept any 2xx success code)
+if [ "${HTTP_CODE:-000}" -lt 200 ] || [ "${HTTP_CODE:-000}" -ge 300 ]; then
 	echo "ERROR: Failed to push metrics to ${METRICS_ENDPOINT} (HTTP ${HTTP_CODE})" >&2
 	exit 1
 fi

@@ -46,6 +46,12 @@ Receive metrics from sources (HPC, FastAPI).
 }
 ```
 
+**Validation:**
+
+- `timestamp` must be a Unix timestamp (seconds) within acceptable range:
+  - Not more than 1 year in the past
+  - Not more than 1 hour in the future
+
 **Response:**
 
 ```json
@@ -76,6 +82,7 @@ JSON API for custom dashboards.
 - `source` (optional): Filter by source (hpc, fastapi)
 - `window` (optional): Time window (1m, 5m, 1h, 1d) - default 1h
 - `metric` (optional): Filter by metric name
+- `limit` (optional): Maximum rows to return (1-50000, default 10000)
 
 **Response:**
 
@@ -150,6 +157,7 @@ Set via Wrangler secrets:
 Optional variables (set in `wrangler.toml` under `[vars]`):
 
 - `METRICS_RETENTION_DAYS` - Number of days to retain metrics (default: 7)
+- `ALLOWED_ORIGIN` - CORS Access-Control-Allow-Origin header (default: '*')
 
 ### Data Retention
 

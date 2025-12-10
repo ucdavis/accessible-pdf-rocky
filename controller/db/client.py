@@ -1,10 +1,13 @@
 """HTTP client for D1 database API."""
 
+import logging
 import os
 from typing import Any, Optional, Union, cast
 from uuid import UUID
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 # Configuration
 DB_API_URL = os.getenv("DB_API_URL", "http://localhost:8787")
@@ -75,6 +78,7 @@ class DatabaseClient:
 
         Raises:
             httpx.HTTPStatusError: If request fails
+            ValueError: If response contains invalid JSON
         """
         client = await self._get_client()
         url = f"{self.base_url}{path}"
@@ -84,7 +88,11 @@ class DatabaseClient:
         if response.status_code == 204:  # No content
             return {}
 
-        return response.json()
+        try:
+            return response.json()
+        except ValueError as e:
+            logger.error(f"Invalid JSON response from {url}: {e}")
+            raise ValueError(f"Invalid JSON response from API: {e}") from e
 
     # Job operations
     async def create_job(
@@ -158,8 +166,14 @@ class DatabaseClient:
             params["user_id"] = str(user_id)
 
         result = await self._request("GET", "/jobs", params=params)
-        # API returns a list for this endpoint
-        return result if isinstance(result, list) else []
+        # API should return a list for this endpoint
+        if not isinstance(result, list):
+            logger.warning(
+                f"Unexpected response type from /jobs endpoint: {type(result).__name__}. "
+                f"Expected list, got: {result}"
+            )
+            return []
+        return result
 
     async def update_job(
         self,

@@ -7,6 +7,7 @@ run arbitrary commands on the HPC system.
 """
 
 import os
+import re
 import shlex
 import subprocess
 import time
@@ -14,6 +15,9 @@ from pathlib import Path
 
 # TODO: Import metrics when ready
 # from metrics import submitted_jobs, submission_failures, submission_latency
+
+# Regex pattern for parsing SLURM job ID from sbatch output
+SLURM_JOB_ID_PATTERN = re.compile(r"Submitted batch job (\d+)")
 
 # Configuration from environment variables
 SLURM_HOST = os.environ.get("SLURM_HOST", "")
@@ -34,6 +38,21 @@ if ENVIRONMENT == "production":
             "SLURM_KEY_PATH must be set in production environment. "
             "Set the SLURM_KEY_PATH environment variable."
         )
+
+
+def _sanitize_job_name(job_id: str) -> str:
+    """Sanitize job_id for use in SBATCH job-name directive.
+
+    SBATCH directives are parsed by SLURM, not bash, so they should not
+    contain shell quotes. This function ensures only safe characters are used.
+
+    Args:
+        job_id: Job identifier
+
+    Returns:
+        Sanitized job name with only alphanumeric, hyphen, and underscore characters
+    """
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", job_id)
 
 
 def submit_slurm_job(job_id: str, input_url: str, output_url: str) -> str:
@@ -98,9 +117,10 @@ def _create_job_script(job_id: str, input_url: str, output_url: str) -> str:
         Path to local temporary script
     """
     # Create temporary script with environment variables set
-    # Use shlex.quote() to prevent shell injection via URLs
+    # Note: SBATCH directives are parsed by SLURM, not bash, so use sanitization not quoting
+    # Use shlex.quote() for bash variables to prevent shell injection via URLs
     script_content = f"""#!/bin/bash
-#SBATCH --job-name=wcag-{shlex.quote(job_id)}
+#SBATCH --job-name=wcag-{_sanitize_job_name(job_id)}
 #SBATCH --gres=gpu:1
 #SBATCH --partition=gpu
 #SBATCH --time=02:00:00
@@ -112,7 +132,7 @@ export INPUT_URL={shlex.quote(input_url)}
 export OUTPUT_URL={shlex.quote(output_url)}
 
 # Source the main job script
-source {REMOTE_SCRIPT_DIR}/job_template.sh
+source {shlex.quote(f"{REMOTE_SCRIPT_DIR}/job_template.sh")}
 """
 
     tmp_script = f"/tmp/slurm_job_{job_id}.sh"
@@ -182,5 +202,11 @@ def _submit_via_ssh(remote_script: str) -> str:
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
     # sbatch output: "Submitted batch job <id>"
-    slurm_id = result.stdout.strip().split()[-1]
+    # Use regex for robust parsing in case of warnings or format changes
+    match = SLURM_JOB_ID_PATTERN.search(result.stdout)
+    if not match:
+        raise RuntimeError(
+            f"Failed to parse SLURM job ID from sbatch output: {result.stdout}"
+        )
+    slurm_id = match.group(1)
     return slurm_id

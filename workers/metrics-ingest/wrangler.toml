@@ -15,6 +15,7 @@ database_id = "" # Will be filled after running: wrangler d1 create metrics-db
 # Environment variables
 # [vars]
 # METRICS_RETENTION_DAYS = "7"  # Optional: defaults to 7 days
+# ALLOWED_ORIGIN = "https://your-domain.com"  # Optional: restrict CORS (defaults to '*')
 
 # Cron trigger for automated data retention
 # Runs daily at 2 AM UTC to clean up old metrics

@@ -9,6 +9,7 @@ export interface Env {
 	METRICS_DB: D1Database;
 	METRICS_AUTH_TOKEN: string;
 	METRICS_RETENTION_DAYS?: string; // Optional, defaults to 7
+	ALLOWED_ORIGIN?: string; // Optional, defaults to '*'
 }
 
 /**
@@ -44,9 +45,9 @@ export default {
 
 		// CORS headers for browser access
 		// Note: Using '*' for Access-Control-Allow-Origin. In production, consider
-		// restricting to specific trusted origins via environment variable.
+		// restricting to specific trusted origins via ALLOWED_ORIGIN environment variable.
 		const corsHeaders = {
-			'Access-Control-Allow-Origin': '*',
+			'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || '*',
 			'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 			'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 		};
@@ -133,6 +134,17 @@ async function handleIngest(request: Request, env: Env, corsHeaders: Record<stri
 	// Validate payload
 	if (!payload.source || !payload.timestamp || !payload.metrics) {
 		return new Response('Invalid payload: missing source, timestamp, or metrics', {
+			status: 400,
+			headers: corsHeaders,
+		});
+	}
+
+	// Validate timestamp (must be reasonable Unix timestamp in seconds)
+	const now = Math.floor(Date.now() / 1000);
+	const oneYearAgo = now - 31536000;
+	const oneHourFuture = now + 3600;
+	if (payload.timestamp < oneYearAgo || payload.timestamp > oneHourFuture) {
+		return new Response('Invalid payload: timestamp out of acceptable range', {
 			status: 400,
 			headers: corsHeaders,
 		});
@@ -248,7 +260,13 @@ async function handleApiMetrics(url: URL, env: Env, corsHeaders: Record<string, 
 		params.push(metricName);
 	}
 
-	query += ' ORDER BY timestamp DESC LIMIT 10000';
+	// Configurable limit with reasonable maximum
+	const maxLimit = 50000;
+	const requestedLimit = parseInt(url.searchParams.get('limit') || '10000', 10);
+	const limit = Number.isNaN(requestedLimit) ? 10000 : Math.min(Math.max(1, requestedLimit), maxLimit);
+
+	query += ' ORDER BY timestamp DESC LIMIT ?';
+	params.push(limit);
 
 	const { results } = await env.METRICS_DB.prepare(query).bind(...params).all();
 

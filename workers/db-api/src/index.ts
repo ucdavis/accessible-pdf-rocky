@@ -41,7 +41,7 @@ interface User {
 	name?: string;
 	organization?: string;
 	created_at: number;
-	is_active: number;
+	is_active: number; // SQLite: 0 = false, 1 = true
 }
 
 interface ProcessingMetric {
@@ -50,7 +50,7 @@ interface ProcessingMetric {
 	processing_time_seconds?: number;
 	pdf_pages?: number;
 	pdf_size_bytes?: number;
-	success: number;
+	success: number; // SQLite: 0 = false, 1 = true
 	error_message?: string;
 	created_at: number;
 }

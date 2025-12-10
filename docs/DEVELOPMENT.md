@@ -111,7 +111,16 @@ npm run db:migrate:local  # Apply schema to local D1
 npm run dev  # Start on port 8787 with local D1
 ```
 
-**Note:** `wrangler dev` includes a local D1 SQLite instance automatically - no Docker needed! The local database is stored in `.wrangler/state/` and persists between runs.
+Terminal 4 - Metrics Ingest Worker (Optional):
+
+```bash
+cd workers/metrics-ingest
+npm install
+npm run db:migrate:local  # Apply schema to local D1
+npx wrangler dev --port 8788  # Start on port 8788 to avoid conflict with db-api
+```
+
+**Note:** `wrangler dev` includes a local D1 SQLite instance automatically - no Docker needed! The local database is stored in `.wrangler/state/` and persists between runs. The metrics worker runs on port 8788 to avoid port conflict with db-api (port 8787).
 
 ## Environment Configuration
 
@@ -127,8 +136,8 @@ STORAGE_MODE=local
 STORAGE_PATH=./storage
 QUEUE_MODE=direct
 
-# Optional: Metrics collection
-METRICS_ENDPOINT=http://localhost:8787/ingest
+# Optional: Metrics collection (requires metrics-ingest worker on port 8788)
+METRICS_ENDPOINT=http://localhost:8788/ingest
 METRICS_TOKEN=dev-token
 ```
 
@@ -176,22 +185,42 @@ For full Cloudflare testing, deploy to a preview environment.
 
 ## Database Setup
 
-### Auto-migration (Docker Compose)
+The project uses [Cloudflare D1](https://developers.cloudflare.com/d1/) for database storage via two Workers:
 
-The controller automatically runs migrations on startup.
+- `workers/db-api` - Main application database
+- `workers/metrics-ingest` - Metrics collection database
 
-### Manual migration (Local)
+### Local Development
+
+Wrangler automatically creates a local D1 SQLite instance in `.wrangler/state/` when you run `npm run dev`. Apply schema migrations:
 
 ```bash
-cd controller
-uv run alembic upgrade head
+cd workers/db-api
+npm run db:migrate:local  # Apply schema to local D1
 ```
 
-### Reset database
+For metrics:
 
 ```bash
-docker compose down -v  # Remove volumes
-docker compose up       # Recreate
+cd workers/metrics-ingest
+npm run db:migrate:local
+```
+
+### Remote (Production) Migrations
+
+After updating `schema.sql`, apply to production:
+
+```bash
+cd workers/db-api
+npm run db:migrate:remote  # Requires Cloudflare credentials
+```
+
+### Reset Local Database
+
+```bash
+rm -rf workers/db-api/.wrangler/state/
+rm -rf workers/metrics-ingest/.wrangler/state/
+# Then re-run npm run db:migrate:local
 ```
 
 ## Development Workflow
