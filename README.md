@@ -64,6 +64,12 @@ just help
 - [Testing Strategy](docs/TESTING.md) - Test coverage and approach
 - [Why This Project?](docs/WHY.md) - Problem statement and rationale
 
+### Operations
+
+- [Monitoring Setup](docs/MONITORING_SETUP.md) - Prometheus and Grafana configuration
+- [Metrics Deployment](docs/METRICS_DEPLOYMENT.md) - Cloudflare Worker metrics infrastructure
+- [Security Setup](docs/SECURITY_SETUP.md) - Authentication and secure configuration
+
 ## MVP Progress
 
 Track development: [MVP v0.1 Milestone](https://github.com/ucdavis/accessible-pdf-rocky/milestone/1)

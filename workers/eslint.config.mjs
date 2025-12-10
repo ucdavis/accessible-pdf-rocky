@@ -19,10 +19,15 @@ export default [
         Headers: "readonly",
         crypto: "readonly",
         File: "readonly",
+        URL: "readonly",
+        console: "readonly",
         // Cloudflare Workers types
         R2Bucket: "readonly",
         Queue: "readonly",
         Env: "readonly",
+        D1Database: "readonly",
+        ExecutionContext: "readonly",
+        ScheduledEvent: "readonly",
       },
     },
     plugins: {

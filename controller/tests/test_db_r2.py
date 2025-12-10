@@ -23,27 +23,18 @@ class TestDBModels:
         from db.models import Job
 
         assert Job is not None
-        # Verify Job is a valid SQLModel class
-        assert hasattr(Job, "__tablename__")
-        assert Job.__tablename__ == "jobs"
 
     def test_user_model_exists(self):
         """Test that User model class exists."""
         from db.models import User
 
         assert User is not None
-        # Verify User is a valid SQLModel class
-        assert hasattr(User, "__tablename__")
-        assert User.__tablename__ == "users"
 
-    def test_processing_metrics_model_exists(self):
-        """Test that ProcessingMetrics model class exists."""
-        from db.models import ProcessingMetrics
+    def test_processing_metric_model_exists(self):
+        """Test that ProcessingMetric model class exists."""
+        from db.models import ProcessingMetric
 
-        assert ProcessingMetrics is not None
-        # Verify ProcessingMetrics is a valid SQLModel class
-        assert hasattr(ProcessingMetrics, "__tablename__")
-        assert ProcessingMetrics.__tablename__ == "processing_metrics"
+        assert ProcessingMetric is not None
 
     def test_utc_now_returns_timezone_aware_datetime(self):
         """Test that utc_now() returns timezone-aware datetime in UTC."""
@@ -98,17 +89,17 @@ class TestDBModels:
         # Timestamp should be timezone-aware
         assert user.created_at.tzinfo is not None
 
-    def test_processing_metrics_model_fields_and_defaults(self):
-        """Test ProcessingMetrics model field definitions and default values."""
+    def test_processing_metric_model_fields_and_defaults(self):
+        """Test ProcessingMetric model field definitions and default values."""
         from uuid import UUID
-        from db.models import ProcessingMetrics
+        from db.models import ProcessingMetric
 
         # Need a job_id UUID for the foreign key
         from uuid import uuid4
 
         job_id = uuid4()
 
-        metrics = ProcessingMetrics(job_id=job_id)
+        metrics = ProcessingMetric(job_id=job_id)
 
         # Check types and defaults
         assert isinstance(metrics.id, UUID)
@@ -124,48 +115,33 @@ class TestDBModels:
         assert metrics.created_at.tzinfo is not None
 
 
-class TestDBSession:
-    """Tests for db/session.py"""
+class TestDBClient:
+    """Tests for db/client.py"""
 
     def test_imports(self):
-        """Test that db session can be imported."""
-        from db import session
+        """Test that db client can be imported."""
+        from db import client
 
-        assert session is not None
+        assert client is not None
 
-    def test_get_session_exists(self):
-        """Test that get_session function exists and is an async generator."""
-        from db.session import get_session
-        import inspect
+    def test_get_db_client_exists(self):
+        """Test that get_db_client function exists and returns DatabaseClient."""
+        from db.client import get_db_client, DatabaseClient
 
-        assert get_session is not None
-        assert inspect.isasyncgenfunction(get_session)
+        client = get_db_client()
+        assert client is not None
+        assert isinstance(client, DatabaseClient)
 
-    def test_engine_created(self):
-        """Test that database engine is created with async driver."""
-        from db.session import engine
+    def test_database_client_init(self):
+        """Test that DatabaseClient can be initialized."""
+        from db.client import DatabaseClient
 
-        assert engine is not None
-        assert hasattr(engine, "url")
-        # Verify using an async PostgreSQL driver (postgresql+asyncpg, postgresql+asyncpg_sa, etc.)
-        assert engine.url.drivername.startswith("postgresql+")
-        assert "async" in engine.url.drivername
-
-    def test_async_session_factory_created(self):
-        """Test that async session factory is created."""
-        from db.session import async_session
-
-        assert async_session is not None
-        assert callable(async_session)
-
-    @pytest.mark.asyncio
-    async def test_init_db_exists(self):
-        """Test that init_db async function exists and is callable."""
-        from db.session import init_db
-        import inspect
-
-        assert init_db is not None
-        assert inspect.iscoroutinefunction(init_db)
+        client = DatabaseClient(base_url="http://test", token="test-token")
+        assert client is not None
+        assert client.base_url == "http://test"
+        assert client.token == "test-token"
+        assert "Authorization" in client.headers
+        assert client.headers["Authorization"] == "Bearer test-token"
 
 
 class TestR2Download:

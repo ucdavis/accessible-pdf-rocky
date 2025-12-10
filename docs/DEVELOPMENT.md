@@ -30,10 +30,11 @@ flowchart LR
     A[User] --> B[Next.js<br/>localhost:3000]
     B --> C[FastAPI<br/>localhost:8000]
     C --> D[Local FS]
-    C --> E[Postgres<br/>localhost:5432]
+    C --> E[D1 API Worker<br/>localhost:8787]
     
     style B fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
     style C fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
+    style E fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
 ```
 
 **Key differences:**
@@ -55,9 +56,10 @@ just dev
 
 This starts:
 
-- PostgreSQL on port 5432
 - FastAPI controller on port 8000
 - Next.js frontend on port 3000
+
+**Note:** The D1 API worker is not included in docker-compose. You need to run it separately with `wrangler dev` (see Terminal 3 setup below). This is intentional - Wrangler's local dev server provides D1 emulation without Docker.
 
 **Detached mode:**
 
@@ -100,11 +102,25 @@ just dev-controller
 cd controller && uv run uvicorn main:app --reload
 ```
 
-Terminal 3 - Postgres (via Docker):
+Terminal 3 - D1 API Worker:
 
 ```bash
-docker run -p 5432:5432 -e POSTGRES_PASSWORD=devpass postgres:16-alpine
+cd workers/db-api
+npm install
+npm run db:migrate:local  # Apply schema to local D1
+npm run dev  # Start on port 8787 with local D1
 ```
+
+Terminal 4 - Metrics Ingest Worker (Optional):
+
+```bash
+cd workers/metrics-ingest
+npm install
+npm run db:migrate:local  # Apply schema to local D1
+npx wrangler dev --port 8788  # Start on port 8788 to avoid conflict with db-api
+```
+
+**Note:** `wrangler dev` includes a local D1 SQLite instance automatically - no Docker needed! The local database is stored in `.wrangler/state/` and persists between runs. The metrics worker runs on port 8788 to avoid port conflict with db-api (port 8787).
 
 ## Environment Configuration
 
@@ -113,10 +129,16 @@ docker run -p 5432:5432 -e POSTGRES_PASSWORD=devpass postgres:16-alpine
 Create `controller/.env`:
 
 ```bash
-DATABASE_URL=postgresql://dev:devpass@localhost:5432/accessible_pdf
+ENVIRONMENT=development
+DB_API_URL=http://localhost:8787
+DB_API_TOKEN=dev-token
 STORAGE_MODE=local
 STORAGE_PATH=./storage
 QUEUE_MODE=direct
+
+# Optional: Metrics collection (requires metrics-ingest worker on port 8788)
+METRICS_ENDPOINT=http://localhost:8788/ingest
+METRICS_TOKEN=dev-token
 ```
 
 **Modes:**
@@ -125,6 +147,12 @@ QUEUE_MODE=direct
 - `STORAGE_MODE=r2` - Use actual R2 (requires credentials)
 - `QUEUE_MODE=direct` - Process jobs immediately
 - `QUEUE_MODE=cloudflare` - Use Cloudflare Queues (requires credentials)
+
+**Metrics (Optional):**
+
+- `METRICS_ENDPOINT` - URL for push-based metrics collection (see [Metrics Deployment](METRICS_DEPLOYMENT.md))
+- `METRICS_TOKEN` - Authentication token for metrics endpoint
+- If not configured, metrics collection is silently disabled
 
 ### Frontend (.env.local)
 
@@ -157,22 +185,42 @@ For full Cloudflare testing, deploy to a preview environment.
 
 ## Database Setup
 
-### Auto-migration (Docker Compose)
+The project uses [Cloudflare D1](https://developers.cloudflare.com/d1/) for database storage via two Workers:
 
-The controller automatically runs migrations on startup.
+- `workers/db-api` - Main application database
+- `workers/metrics-ingest` - Metrics collection database
 
-### Manual migration (Local)
+### Local Development
+
+Wrangler automatically creates a local D1 SQLite instance in `.wrangler/state/` when you run `npm run dev`. Apply schema migrations:
 
 ```bash
-cd controller
-uv run alembic upgrade head
+cd workers/db-api
+npm run db:migrate:local  # Apply schema to local D1
 ```
 
-### Reset database
+For metrics:
 
 ```bash
-docker compose down -v  # Remove volumes
-docker compose up       # Recreate
+cd workers/metrics-ingest
+npm run db:migrate:local
+```
+
+### Remote (Production) Migrations
+
+After updating `schema.sql`, apply to production:
+
+```bash
+cd workers/db-api
+npm run db:migrate:remote  # Requires Cloudflare credentials
+```
+
+### Reset Local Database
+
+```bash
+rm -rf workers/db-api/.wrangler/state/
+rm -rf workers/metrics-ingest/.wrangler/state/
+# Then re-run npm run db:migrate:local
 ```
 
 ## Development Workflow
@@ -271,14 +319,15 @@ ports:
 ### Database Connection Errors
 
 ```bash
-# Check if Postgres is running
-docker compose ps
+# Check if D1 API Worker is running
+cd workers/db-api
+npm run dev
 
-# View Postgres logs
-docker compose logs postgres
+# Test API connection
+curl http://localhost:8787/jobs \
+  -H "Authorization: Bearer dev-token"
 
-# Restart Postgres
-just dev-restart postgres
+# Check Worker logs in terminal
 ```
 
 ### Import Errors in Python

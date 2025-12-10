@@ -4,9 +4,8 @@
 # TODO: Import presigned URL generation
 # from r2.presigned import generate_presigned_url
 
-# TODO: Import database session and models
-# from db.session import db_session
-# from db.models import Job
+# TODO: Import database client
+# from db.client import get_db_client
 
 
 async def handle_job(message: dict) -> None:
@@ -28,10 +27,13 @@ async def handle_job(message: dict) -> None:
     # slurm_id = submit_slurm_job(job_id, input_url, output_url)
 
     # TODO: Save job to database
-    # with db_session() as db:
-    #     job = Job(id=job_id, slurm_id=slurm_id, status="submitted")
-    #     db.add(job)
-    #     db.commit()
+    # db = get_db_client()
+    # await db.create_job(
+    #     job_id=job_id,
+    #     r2_key=r2_key,
+    #     slurm_id=slurm_id,
+    #     status="submitted"
+    # )
 
     print(f"TODO: Process job {job_id} with R2 key {r2_key}")
 

@@ -719,69 +719,142 @@ flowchart TD
 - Export compliance report
 ```
 
-## Database Schema
+## Database Architecture
 
-### Jobs Table
+### D1 Database with API Worker
+
+The system uses [Cloudflare D1](https://developers.cloudflare.com/d1/) (SQLite) accessed via a dedicated API Worker (`workers/db-api`). FastAPI controller communicates with the database through HTTP REST API, not direct connections.
+
+**Benefits:**
+
+- No database server to manage
+- Cloudflare free tier (5GB storage, 5M reads/day)
+- Consistent with metrics infrastructure
+- Token-based authentication
+- API-based separation of concerns
+
+### Core Tables (MVP)
+
+#### Jobs Table
 
 ```sql
 CREATE TABLE jobs (
-    id UUID PRIMARY KEY,
-    user_id UUID REFERENCES users(id),
-    status VARCHAR(50),  -- pending, processing, completed, failed
-    pdf_key VARCHAR(255),
-    output_key VARCHAR(255),
-    created_at TIMESTAMP,
-    started_at TIMESTAMP,
-    completed_at TIMESTAMP,
-    error_message TEXT
+    id TEXT PRIMARY KEY,
+    slurm_id TEXT,
+    status TEXT NOT NULL DEFAULT 'submitted',
+    r2_key TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    results_url TEXT,
+    user_id TEXT
 );
 ```
 
-### Documents Table
+**Indexes:** `slurm_id`, `status`, `r2_key`, `user_id`, `created_at`
+
+#### Users Table
+
+```sql
+CREATE TABLE users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    name TEXT,
+    organization TEXT,
+    created_at INTEGER NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1
+);
+```
+
+**Indexes:** `email`
+
+#### Processing Metrics Table
+
+```sql
+CREATE TABLE processing_metrics (
+    id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL,
+    processing_time_seconds REAL,
+    pdf_pages INTEGER,
+    pdf_size_bytes INTEGER,
+    success INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (job_id) REFERENCES jobs(id)
+);
+```
+
+**Indexes:** `job_id`, `created_at`
+
+### Future Tables (Post-MVP)
+
+For detailed structure analysis and editing features:
+
+#### Documents Table
 
 ```sql
 CREATE TABLE documents (
-    id UUID PRIMARY KEY,
-    job_id UUID REFERENCES jobs(id),
-    title VARCHAR(255),
+    id TEXT PRIMARY KEY,
+    job_id TEXT,
+    title TEXT,
     page_count INTEGER,
-    pdf_type VARCHAR(50),  -- digital, scanned, hybrid
-    language VARCHAR(10),
-    created_at TIMESTAMP
+    pdf_type TEXT,  -- digital, scanned, hybrid
+    language TEXT,
+    created_at INTEGER,
+    FOREIGN KEY (job_id) REFERENCES jobs(id)
 );
 ```
 
-### Elements Table
+#### Elements Table
 
 ```sql
 CREATE TABLE elements (
-    id UUID PRIMARY KEY,
-    document_id UUID REFERENCES documents(id),
+    id TEXT PRIMARY KEY,
+    document_id TEXT,
     page_number INTEGER,
-    element_type VARCHAR(50),  -- heading, paragraph, figure, table, list
-    bbox JSONB,  -- {x, y, width, height}
+    element_type TEXT,  -- heading, paragraph, figure, table, list
+    bbox TEXT,  -- JSON: {x, y, width, height}
     text TEXT,
     reading_order INTEGER,
-    ai_confidence FLOAT,
-    human_override BOOLEAN,
-    created_at TIMESTAMP
+    ai_confidence REAL,
+    human_override INTEGER,
+    created_at INTEGER,
+    FOREIGN KEY (document_id) REFERENCES documents(id)
 );
 ```
 
-### Alt-Texts Table
+#### Alt-Texts Table
 
 ```sql
 CREATE TABLE alt_texts (
-    id UUID PRIMARY KEY,
-    element_id UUID REFERENCES elements(id),
+    id TEXT PRIMARY KEY,
+    element_id TEXT,
     alt_text TEXT,
     ai_generated TEXT,
-    human_edited BOOLEAN,
-    is_decorative BOOLEAN,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    human_edited INTEGER,
+    is_decorative INTEGER,
+    created_at INTEGER,
+    updated_at INTEGER,
+    FOREIGN KEY (element_id) REFERENCES elements(id)
 );
 ```
+
+### Database Access Pattern
+
+Controller → HTTP API → D1 Worker → D1 Database
+
+```python
+# controller/db/client.py
+from db.client import get_db_client
+
+db = get_db_client()
+job = await db.create_job(
+    job_id=uuid4(),
+    r2_key="uploads/document.pdf",
+    status="submitted"
+)
+```
+
+See `workers/db-api/README.md` for API documentation.
 
 ## Storage Strategy
 

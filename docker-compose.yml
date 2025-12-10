@@ -1,22 +1,9 @@
 services:
-  # PostgreSQL database
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-accessible_pdf}
-      POSTGRES_USER: ${POSTGRES_USER:-dev}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpass}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dev} -d ${POSTGRES_DB:-accessible_pdf}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   # FastAPI controller
+  # Note: Requires workers running via wrangler dev:
+  #   - db-api worker on port 8787 (required)
+  #   - metrics-ingest worker on port 8788 (optional)
+  # See docs/DEVELOPMENT.md for setup instructions
   controller:
     build:
       context: ./controller
@@ -24,17 +11,17 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # yamllint disable-line rule:line-length
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dev}:${POSTGRES_PASSWORD:-devpass}@postgres:5432/${POSTGRES_DB:-accessible_pdf}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DB_API_URL: ${DB_API_URL:-http://localhost:8787}
+      DB_API_TOKEN: ${DB_API_TOKEN:-dev-token}
       STORAGE_MODE: ${STORAGE_MODE:-local}
       STORAGE_PATH: ${STORAGE_PATH:-/app/storage}
       QUEUE_MODE: ${QUEUE_MODE:-direct}
+      METRICS_ENDPOINT: ${METRICS_ENDPOINT:-http://localhost:8788/ingest}
+      METRICS_TOKEN: ${METRICS_TOKEN:-dev-token}
     volumes:
       - ./controller:/app
       - storage_data:/app/storage
-    depends_on:
-      postgres:
-        condition: service_healthy
     command: uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   # Next.js frontend
@@ -53,5 +40,4 @@ services:
     command: npm run dev
 
 volumes:
-  postgres_data:
   storage_data:
