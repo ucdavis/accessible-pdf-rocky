@@ -57,16 +57,20 @@ cd workers && npm test
 
 ```
 controller/
-├── tests/
-│   ├── test_main.py           # FastAPI endpoint tests
-│   └── hpc/
-│       └── test_submit.py     # SLURM submission tests
-└── pyproject.toml             # pytest configuration
+├── pyproject.toml             # pytest configuration
+└── tests/
+    ├── hpc/
+    │   └── test_submit.py     # SLURM submission tests
+    ├── services/
+    │   └── test_services.py   # Service layer tests
+    ├── test_db_r2.py          # Database and [R2](https://developers.cloudflare.com/r2/) integration tests
+    └── test_main.py           # FastAPI endpoint tests
 
 hpc_runner/
-├── tests/
-│   └── test_runner.py         # PDF analysis tests
-└── pyproject.toml             # pytest configuration
+├── pyproject.toml             # pytest configuration
+└── tests/
+    ├── test_ai_processors.py  # AI processor tests
+    └── test_runner.py         # Main runner tests
 ```
 
 **Conventions:**
@@ -80,15 +84,34 @@ hpc_runner/
 
 ```
 frontend/
-├── src/app/__tests__/
-│   └── page.test.tsx          # Component tests
+├── src/
+│   ├── app/
+│   │   ├── __tests__/
+│   │   │   ├── layout.test.tsx     # Layout tests
+│   │   │   └── page.test.tsx       # Home page tests
+│   │   ├── jobs/
+│   │   │   ├── [id]/
+│   │   │   │   └── __tests__/
+│   │   │   │       └── page.test.tsx  # Job detail tests
+│   │   │   └── __tests__/
+│   │   │       └── page.test.tsx   # Jobs list tests
+│   │   └── upload/
+│   │       └── __tests__/
+│   │           └── page.test.tsx   # Upload page tests
+│   ├── components/
+│   │   └── __tests__/
+│   │       └── components.test.tsx # Component tests
+│   └── lib/
+│       └── __tests__/
+│           └── api.test.ts         # API client tests
 ├── vitest.config.ts           # Vitest configuration
 └── vitest.setup.ts            # Test setup
 ```
 
 **Conventions:**
 
-- Test files: `*.test.tsx` or `*.spec.tsx`
+- Test files: `*.test.tsx` or `*.test.ts`
+- Co-locate tests in `__tests__/` subdirectories next to source code
 - Use Vitest with React Testing Library
 - Test user interactions, not implementation
 
@@ -97,13 +120,15 @@ frontend/
 ```
 workers/
 ├── tests/
-│   └── upload.test.ts         # Worker tests
+│   ├── job-status.test.ts     # Status query tests
+│   ├── submit-job.test.ts     # Job submission tests
+│   └── upload.test.ts         # Upload worker tests
 └── vitest.config.ts           # Vitest configuration
 ```
 
 **Conventions:**
 
-- Test files: `*.test.ts` or `*.spec.ts`
+- Test files: `*.test.ts`
 - Use Vitest's built-in mocking
 - Test worker behavior in isolation
 
@@ -149,15 +174,19 @@ describe('Module', () => {
 ### View Coverage Locally
 
 ```bash
-# Python
+# Python (controller)
 cd controller && uv run pytest --cov=. --cov-report=html
+open htmlcov/index.html
+
+# Python (hpc_runner)
+cd hpc_runner && uv run pytest --cov=. --cov-report=html
 open htmlcov/index.html
 
 # Frontend
 cd frontend && npm run test:coverage
 open coverage/lcov-report/index.html
 
-# Workers  
+# Workers
 cd workers && npm run test:coverage
 open coverage/index.html
 ```
@@ -173,8 +202,8 @@ Tests run automatically on:
 ### GitHub Actions Workflows
 
 - `.github/workflows/ci.yml` - Main CI workflow (tests + linting)
-- `.github/workflows/security.yml` - Security audits
 - `.github/workflows/codeql.yml` - Code security scanning
+- `.github/workflows/security.yml` - Security audits
 
 ### Workflow Status
 
@@ -244,11 +273,9 @@ npm test -- -u
 
 ### JavaScript/TypeScript Dependencies
 
-#### Frontend & Workers
-
-- `vitest` - Fast test framework
-- `@testing-library/react` - React testing utilities (frontend)
+- `@testing-library/react` - React testing utilities (frontend only)
 - `jsdom` - DOM environment for tests
+- `vitest` - Fast test framework
 
 ## Continuous Improvement
 

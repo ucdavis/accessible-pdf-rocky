@@ -1,6 +1,6 @@
 # Accessible PDF AI
 
-Production-grade accessible PDF system with Cloudflare Workers, FastAPI, and HPC/SLURM integration.
+Production-grade accessible PDF system with [Cloudflare Workers](https://developers.cloudflare.com/workers/), [FastAPI](https://fastapi.tiangolo.com/), and HPC/SLURM integration.
 
 [![CI](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/ci.yml/badge.svg)](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/codeql.yml/badge.svg)](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/codeql.yml)
@@ -28,10 +28,10 @@ Designed for UC Davis document remediation needs.
 
 ## Repository Structure
 
-- `controller/` – FastAPI bridge to HPC cluster
+- `controller/` – [FastAPI](https://fastapi.tiangolo.com/) bridge to HPC cluster
 - `frontend/` – Next.js UI (Cloudflare Pages)
 - `hpc_runner/` – SLURM job runner (heavy ML + PDF)
-- `workers/` – Cloudflare Workers (R2 + Queues)
+- `workers/` – [Cloudflare Workers](https://developers.cloudflare.com/workers/) (R2 + Queues)
 
 ## Quick Start
 

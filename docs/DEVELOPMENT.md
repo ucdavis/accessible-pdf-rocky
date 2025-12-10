@@ -136,7 +136,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ## Testing Cloudflare Workers Locally
 
-Cloudflare provides `wrangler dev` for local testing:
+[Cloudflare Workers](https://developers.cloudflare.com/workers/) provides `wrangler dev` for local testing:
 
 ```bash
 cd workers
@@ -216,7 +216,7 @@ Local:
 
 ### Controller Endpoints
 
-FastAPI provides auto-generated docs:
+[FastAPI](https://fastapi.tiangolo.com/) provides auto-generated docs:
 
 - Swagger UI: <http://localhost:8000/docs>
 - ReDoc: <http://localhost:8000/redoc>
@@ -384,7 +384,7 @@ services:
 wrangler queues create pdf-jobs --env preview
 ```
 
-### Cloudflare Workers
+### [Cloudflare Workers](https://developers.cloudflare.com/workers/)
 
 **Use `wrangler dev`:**
 

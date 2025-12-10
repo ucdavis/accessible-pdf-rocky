@@ -1,54 +1,51 @@
 # Architecture
 
-This document outlines the production-grade architecture for the accessible PDF system, integrating Cloudflare Workers, FastAPI, and local HPC with SLURM.
+This document outlines the production-grade architecture for the accessible PDF system, integrating [Cloudflare Workers](https://developers.cloudflare.com/workers/), [FastAPI](https://fastapi.tiangolo.com/), and local HPC with SLURM.
 
 ## System Architecture Overview
 
-### 🔵 Cloudflare Layer (edge, fast, cheap)
+### 🔵 Cloudflare Layer (cheap, edge, fast, on-demand, scalable)
 
-- **Next.js frontend** on Cloudflare Pages
-- **Cloudflare Worker API**:
+- **[Next.js](https://nextjs.org/) frontend** on [Cloudflare Pages](https://developers.cloudflare.com/pages/)
+- **[Cloudflare Worker](https://developers.cloudflare.com/workers/) API**:
   - PDF upload → R2
   - Submit jobs → Cloudflare Queue
   - Expose job status
-- **R2 Object Storage**:
+- **[R2](https://developers.cloudflare.com/r2/) Object Storage**:
   - Raw PDFs
   - Intermediate JSON
   - Final WCAG-compliant PDFs
-- **Cloudflare Queues**:
+- **[Cloudflare Queues](https://developers.cloudflare.com/queues/)**:
   - Routes jobs to GPU inference workers via FastAPI
 
 Cloudflare provides fast ingress, scaling, and routing—not heavy compute.
 
-### 🟢 FastAPI Layer (job controller)
+### 🟢 [FastAPI](https://fastapi.tiangolo.com/) Layer (job controller)
 
 Runs on a publicly accessible host:
 
-- Azure VM
-- On-prem login node (NOT compute node)
-- Small Kubernetes VM
-- Bare-metal host
+- [Azure App Service](https://learn.microsoft.com/en-us/azure/app-service/quickstart-python)
 
 **Responsibilities:**
 
 - Pull jobs from Cloudflare Queues
-- Create SLURM job submissions
+- Create [SLURM](https://slurm.schedmd.com/) job submissions
 - Track job status
 - Fetch results from HPC
 - Upload outputs to R2
-- Update Postgres
+- Update [Postgres](https://www.postgresql.org/)
 - Expose API to frontend
 
 The FastAPI service bridges Cloudflare and the HPC cluster.
 
 ### 🔴 Local HPC Cluster (heavy compute)
 
-SLURM manages:
+[SLURM](https://slurm.schedmd.com/) manages:
 
-- LayoutLMv3 / Donut / TAPAS inference
-- BLIP-2 / LLaVA alt-text generation
-- OCR (Tesseract, PaddleOCR, or Azure OCR fallback)
-- PDF tagging with iText or PyMuPDF
+- [LayoutLMv3](https://huggingface.co/docs/transformers/model_doc/layoutlmv3) / Donut / TAPAS inference
+- [BLIP-2](https://huggingface.co/docs/transformers/model_doc/blip-2) / LLaVA alt-text generation
+- OCR ([Tesseract](https://github.com/tesseract-ocr/tesseract), [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR), or Azure OCR fallback)
+- PDF tagging with iText or [PyMuPDF](https://pymupdf.readthedocs.io/)
 - WCAG rule enforcement
 
 Workers run on GPU nodes (A100/H100, etc.).
@@ -93,7 +90,7 @@ accessible-pdf-rocky/
 │       ├── codeql.yml
 │       └── security.yml
 │
-├── controller/               # FastAPI bridge service
+├── controller/               # FastAPI bridge service (https://fastapi.tiangolo.com/)
 │   ├── main.py
 │   ├── queue_listener.py
 │   ├── hpc/
@@ -164,7 +161,7 @@ accessible-pdf-rocky/
 │   │   └── tagging.py        # PDF tagging (PyMuPDF/iText)
 │   └── pyproject.toml
 │
-├── workers/                  # Cloudflare Workers (edge API endpoints)
+├── workers/                  # Cloudflare Workers (https://developers.cloudflare.com/workers/)
 │   ├── api/
 │   │   ├── upload.ts         # PDF upload to R2
 │   │   ├── submit-job.ts     # Job submission to queue
@@ -182,9 +179,9 @@ accessible-pdf-rocky/
 
 ### Component Clarification: workers/ vs hpc_runner/
 
-**Important**: "workers" refers to Cloudflare Workers, not compute workers!
+**Important**: "workers" refers to [Cloudflare Workers](https://developers.cloudflare.com/workers/), not compute workers!
 
-#### workers/ - Cloudflare Workers (Edge API)
+#### workers/ - [Cloudflare Workers](https://developers.cloudflare.com/workers/) (Edge API)
 
 - **Runtime**: Cloudflare's global edge network
 - **Language**: TypeScript
@@ -197,7 +194,7 @@ accessible-pdf-rocky/
 
 #### hpc_runner/ - HPC Compute Jobs (Heavy ML)
 
-- **Runtime**: University HPC cluster via SLURM
+- **Runtime**: HPC@UCD cluster via [SLURM](https://slurm.schedmd.com/)
 - **Language**: Python
 - **Purpose**: GPU-intensive ML processing (minutes to hours)
 - **Resources**: GPU nodes (A100/H100), 10s of GB RAM
@@ -205,9 +202,9 @@ accessible-pdf-rocky/
   - `ai/` = Low-level ML model wrappers (loads models, runs inference)
   - `processors/` = High-level business logic (validates, adds WCAG rules)
 - **Responsibilities**:
-  - Layout detection (LayoutLMv3 - GPU intensive)
-  - Alt-text generation (BLIP-2/LLaVA - GPU intensive)
-  - OCR (Tesseract/PaddleOCR)
+  - Layout detection ([LayoutLMv3](https://huggingface.co/docs/transformers/model_doc/layoutlmv3) - GPU intensive)
+  - Alt-text generation ([BLIP-2](https://huggingface.co/docs/transformers/model_doc/blip-2)/LLaVA - GPU intensive)
+  - OCR ([Tesseract](https://github.com/tesseract-ocr/tesseract)/[PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR))
   - WCAG compliance checking
   - PDF tagging and remediation
 
@@ -381,7 +378,7 @@ def submit_slurm_job(job_id: str, pdf_path: str) -> str:
 # Change to hpc_runner directory
 cd $HOME/accessible-pdf-rocky/hpc_runner
 
-# Run using uv
+# Run using uv (https://docs.astral.sh/uv/)
 uv run runner.py $PDF_PATH \
   --job-id $JOB_ID \
   --output results/${JOB_ID}.json
@@ -535,7 +532,7 @@ export default {
 ### HPC Runner
 
 - Deployed to HPC shared filesystem
-- Uses uv for Python environment management
+- Uses [uv](https://docs.astral.sh/uv/) for Python environment management
 - Requires GPU nodes for inference
 - Results stored in shared filesystem or uploaded to R2
 
@@ -557,7 +554,7 @@ export default {
 ## Monitoring
 
 - **Cloudflare**: Analytics dashboard
-- **FastAPI**: Prometheus metrics
+- **FastAPI**: [Prometheus](https://prometheus.io/) metrics
 - **SLURM**: `sacct`, `squeue` for job monitoring
 - **R2**: Storage metrics via Cloudflare dashboard
 - **Database**: Query performance monitoring

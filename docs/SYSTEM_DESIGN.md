@@ -32,9 +32,9 @@ flowchart TD
 
 **Components:**
 
-- PDF parser (PyMuPDF or pdfplumber)
+- PDF parser ([PyMuPDF](https://pymupdf.readthedocs.io/) or [pdfplumber](https://github.com/jsvine/pdfplumber))
 - Type classifier (heuristic-based)
-- OCR engine (Tesseract, PaddleOCR, or Azure Vision)
+- OCR engine ([Tesseract](https://github.com/tesseract-ocr/tesseract), [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR), or Azure Vision)
 
 ### Stage 2: Layout & Structure Analysis
 
@@ -55,7 +55,7 @@ flowchart TD
     I --> J
 ```
 
-**Primary Model: LayoutLMv3 (Microsoft)**
+**Primary Model: [LayoutLMv3](https://huggingface.co/docs/transformers/model_doc/layoutlmv3) (Microsoft)**
 
 - Vision + text + spatial understanding
 - Designed for document structure
@@ -66,14 +66,14 @@ flowchart TD
   - Decorative element identification
   - List detection and nesting
 
-**Alternative: Donut (Naver Clova)**
+**Alternative: [Donut](https://huggingface.co/docs/transformers/model_doc/donut) (Naver Clova)**
 
 - OCR-free document understanding
 - Good for forms and structured documents
 - Use as inference module (no fine-tuning needed)
 
-**Why Not BERT?**
-BERT lacks spatial awareness—critical for understanding document layout and reading order.
+**Why Not [BERT](https://huggingface.co/docs/transformers/model_doc/bert)?**
+[BERT](https://huggingface.co/docs/transformers/model_doc/bert) lacks spatial awareness—critical for understanding document layout and reading order.
 
 ### Stage 3: Reading Order Determination
 
@@ -114,9 +114,9 @@ flowchart LR
 
 **Best Models:**
 
-- **BLIP-2** - Strong captioning, factual descriptions
-- **LLaVA-1.6** - High-quality vision understanding
-- **MiniGPT-5** - Efficient, accurate captions
+- **[BLIP-2](https://huggingface.co/docs/transformers/model_doc/blip-2)** - Strong captioning, factual descriptions
+- **[LLaVA](https://github.com/haotian-liu/LLaVA)-1.6** - High-quality vision understanding
+- **[MiniGPT-5](https://github.com/eric-ai-lab/MiniGPT-5)** - Efficient, accurate captions
 
 **Fine-tuning strategy:**
 
@@ -153,13 +153,13 @@ flowchart LR
 
 **Vision-based approaches:**
 
-- TableNet
-- CascadeTabNet
+- [TableNet](https://github.com/asagar60/TableNet-pytorch)
+- [CascadeTabNet](https://github.com/DevashishPrasad/CascadeTabNet)
 
 **Transformer-based approaches:**
 
-- **TAPAS (Google)** - Table parsing to JSON
-- **TaBERT (Facebook)** - Table understanding
+- **[TAPAS](https://huggingface.co/docs/transformers/model_doc/tapas) (Google)** - Table parsing to JSON
+- **[TaBERT](https://github.com/facebookresearch/TaBERT) (Facebook)** - Table understanding
 
 **Fine-tuning data:**
 
@@ -232,9 +232,9 @@ flowchart LR
 
 **Tools:**
 
-- **PyMuPDF** - PDF manipulation
-- **iText (Java)** - Commercial-grade PDF tagging
-- **pdfplumber** - Text extraction for verification
+- **[PyMuPDF](https://pymupdf.readthedocs.io/)** - PDF manipulation
+- **[iText](https://itextpdf.com/) (Java)** - Commercial-grade PDF tagging
+- **[pdfplumber](https://github.com/jsvine/pdfplumber)** - Text extraction for verification
 
 **Output includes:**
 
@@ -249,18 +249,18 @@ flowchart LR
 
 | Task | Best Model | Fine-Tune? | Priority |
 |------|-----------|------------|----------|
-| Layout parsing | LayoutLMv3, Donut | Yes | Critical |
-| Reading order | LayoutLMv3 | Yes | Critical |
-| Alt-text generation | BLIP-2, LLaVA | Yes | High |
-| Table structure | TAPAS, TaBERT | Yes | High |
-| OCR | Tesseract, Google Vision | No | Medium |
-| Page understanding | GPT-4 Vision, Donut | No | Low |
+| Layout parsing | [LayoutLMv3](https://huggingface.co/docs/transformers/model_doc/layoutlmv3), [Donut](https://huggingface.co/docs/transformers/model_doc/donut) | Yes | Critical |
+| Reading order | [LayoutLMv3](https://huggingface.co/docs/transformers/model_doc/layoutlmv3) | Yes | Critical |
+| Alt-text generation | [BLIP-2](https://huggingface.co/docs/transformers/model_doc/blip-2), [LLaVA](https://github.com/haotian-liu/LLaVA) | Yes | High |
+| Table structure | [TAPAS](https://huggingface.co/docs/transformers/model_doc/tapas), [TaBERT](https://github.com/facebookresearch/TaBERT) | Yes | High |
+| OCR | [Tesseract](https://github.com/tesseract-ocr/tesseract), Google Vision | No | Medium |
+| Page understanding | GPT-4 Vision, [Donut](https://huggingface.co/docs/transformers/model_doc/donut) | No | Low |
 
 ## Fine-Tuning Priorities
 
 ### 1. Heading Classification & Hierarchy (Critical)
 
-**Model:** LayoutLMv3
+**Model:** [LayoutLMv3](https://huggingface.co/docs/transformers/model_doc/layoutlmv3)
 
 **Input:** Text + bounding box + style features (font size, weight, indentation)
 
@@ -270,7 +270,7 @@ flowchart LR
 
 ### 2. Reading Order Prediction (Critical)
 
-**Model:** LayoutLMv3 fine-tuned for sequence prediction
+**Model:** [LayoutLMv3](https://huggingface.co/docs/transformers/model_doc/layoutlmv3) fine-tuned for sequence prediction
 
 **Input:** Set of document elements with positions
 
@@ -280,7 +280,7 @@ flowchart LR
 
 ### 3. Alt-Text Generation (High Priority)
 
-**Model:** BLIP-2 or LLaVA
+**Model:** [BLIP-2](https://huggingface.co/docs/transformers/model_doc/blip-2) or [LLaVA](https://github.com/haotian-liu/LLaVA)
 
 **Training set:**
 
@@ -293,7 +293,7 @@ flowchart LR
 
 ### 4. Table Structure Recognition (High Priority)
 
-**Model:** TAPAS
+**Model:** [TAPAS](https://huggingface.co/docs/transformers/model_doc/tapas)
 
 **Training set:**
 
@@ -307,29 +307,29 @@ flowchart LR
 
 ### Two-Layer Orchestration
 
-**Layer 1: Controller (Cloudflare ↔ HPC ↔ R2 Flow)**
+**Layer 1: Controller (Cloudflare ↔ HPC ↔ [R2](https://developers.cloudflare.com/r2/) Flow)**
 
 The `controller/services/` layer orchestrates job flow between components:
 
-- Pulls jobs from Cloudflare Queue
-- Downloads PDFs from R2
-- Submits SLURM jobs to HPC
+- Pulls jobs from [Cloudflare Queue](https://developers.cloudflare.com/queues/)
+- Downloads PDFs from [R2](https://developers.cloudflare.com/r2/)
+- Submits [SLURM](https://slurm.schedmd.com/) jobs to HPC
 - Monitors job status
 - Retrieves results
-- Uploads to R2
+- Uploads to [R2](https://developers.cloudflare.com/r2/)
 - Updates database
 
 **Layer 2: HPC Runner (ML Pipeline on GPU)**
 
 The `hpc_runner/` layer orchestrates heavy ML processing:
 
-- Loads GPU models (LayoutLMv3, BLIP-2, TAPAS)
+- Loads GPU models ([LayoutLMv3](https://huggingface.co/docs/transformers/model_doc/layoutlmv3), [BLIP-2](https://huggingface.co/docs/transformers/model_doc/blip-2), [TAPAS](https://huggingface.co/docs/transformers/model_doc/tapas))
 - Runs layout detection
 - Generates alt-text
 - Parses tables
 - Outputs results
 
-### FastAPI Job Pipeline (Controller)
+### [FastAPI](https://fastapi.tiangolo.com/) Job Pipeline (Controller)
 
 ```python
 # controller/services/job_runner.py
@@ -405,11 +405,11 @@ def analyze_pdf(pdf_path: str, job_id: str) -> dict:
 
 ### Service Layer Organization (Controller)
 
-Runs on FastAPI controller, orchestrates Cloudflare ↔ HPC ↔ R2:
+Runs on [FastAPI](https://fastapi.tiangolo.com/) controller, orchestrates Cloudflare ↔ HPC ↔ [R2](https://developers.cloudflare.com/r2/):
 
 ```
 controller/services/
-├── pdf_parser.py          # PyMuPDF/pdfplumber extraction (lightweight)
+├── pdf_parser.py          # [PyMuPDF](https://pymupdf.readthedocs.io/)/[pdfplumber](https://github.com/jsvine/pdfplumber) extraction (lightweight)
 ├── pdf_normalizer.py      # Type detection, preprocessing
 ├── ocr_engine.py          # OCR orchestration (may delegate to HPC)
 ├── wcag_engine.py         # Rule-based validation
@@ -419,7 +419,7 @@ controller/services/
 
 ### AI Inference Layer (HPC GPU Nodes)
 
-Runs on HPC GPU nodes via SLURM, performs heavy ML:
+Runs on HPC GPU nodes via [SLURM](https://slurm.schedmd.com/), performs heavy ML:
 
 ```
 hpc_runner/
@@ -457,7 +457,7 @@ Direct wrappers around heavy ML models. This is the closest to the metal:
 
 - **Purpose:** Load models, run inference, return raw predictions
 - **Responsibilities:**
-  - Model loading (LayoutLMv3, BLIP-2, TAPAS)
+  - Model loading ([LayoutLMv3](https://huggingface.co/docs/transformers/model_doc/layoutlmv3), [BLIP-2](https://huggingface.co/docs/transformers/model_doc/blip-2), [TAPAS](https://huggingface.co/docs/transformers/model_doc/tapas))
   - GPU memory management
   - Forward passes
   - Batch processing optimization
@@ -516,11 +516,11 @@ Application logic that **uses** the AI models to accomplish tasks:
 
 | Processor | Uses ai/ layer? | Notes |
 |-----------|----------------|-------|
-| `processors/layout.py` | ✅ Yes | Calls `ai/layout/` for LayoutLMv3 predictions |
-| `processors/alttext.py` | ✅ Yes | Calls `ai/alt_text/` for BLIP-2/LLaVA captions |
-| `processors/ocr.py` | ❌ No | Calls external OCR engines (Tesseract, PaddleOCR) |
+| `processors/layout.py` | ✅ Yes | Calls `ai/layout/` for [LayoutLMv3](https://huggingface.co/docs/transformers/model_doc/layoutlmv3) predictions |
+| `processors/alttext.py` | ✅ Yes | Calls `ai/alt_text/` for [BLIP-2](https://huggingface.co/docs/transformers/model_doc/blip-2)/[LLaVA](https://github.com/haotian-liu/LLaVA) captions |
+| `processors/ocr.py` | ❌ No | Calls external OCR engines ([Tesseract](https://github.com/tesseract-ocr/tesseract), [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)) |
 | `processors/wcag.py` | ❌ No | Rule-based validation, no ML |
-| `processors/tagging.py` | ❌ No | PDF manipulation with PyMuPDF/iText |
+| `processors/tagging.py` | ❌ No | PDF manipulation with [PyMuPDF](https://pymupdf.readthedocs.io/)/[iText](https://itextpdf.com/) |
 
 **Flow in runner.py:**
 
