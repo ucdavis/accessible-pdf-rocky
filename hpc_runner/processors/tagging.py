@@ -1,4 +1,8 @@
-"""PDF tagging and structure using PyMuPDF or iText."""
+"""PDF tagging and structure using PyMuPDF or iText.
+
+Note: This module does PDF manipulation (no ai/ layer dependency).
+PDF tagging uses PyMuPDF/iText libraries, not ML models.
+"""
 
 from pathlib import Path
 

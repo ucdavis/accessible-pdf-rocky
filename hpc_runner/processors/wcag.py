@@ -1,4 +1,8 @@
-"""WCAG 2.1 AA compliance checking and enforcement."""
+"""WCAG 2.1 AA compliance checking and enforcement.
+
+Note: This module uses rule-based validation (no ai/ layer dependency).
+WCAG compliance is checked via deterministic rules, not ML models.
+"""
 
 from pathlib import Path
 

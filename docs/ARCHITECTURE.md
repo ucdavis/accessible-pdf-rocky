@@ -107,8 +107,14 @@ accessible-pdf-rocky/
 │   ├── db/
 │   │   ├── models.py
 │   │   └── session.py
-│   ├── services/
-│   │   └── result_handler.py
+│   ├── services/            # Orchestration services (Cloudflare ↔ HPC ↔ R2)
+│   │   ├── job_runner.py        # Main orchestrator
+│   │   ├── pdf_parser.py        # PDF parsing
+│   │   ├── pdf_normalizer.py    # Type detection
+│   │   ├── ocr_engine.py        # OCR orchestration
+│   │   ├── wcag_engine.py       # WCAG validation
+│   │   ├── pdf_builder.py       # Tagged PDF construction
+│   │   └── result_handler.py    # Result processing
 │   └── pyproject.toml
 │
 ├── docs/
@@ -139,12 +145,22 @@ accessible-pdf-rocky/
 │
 ├── hpc_runner/               # HPC compute jobs (heavy ML processing)
 │   ├── runner.py             # Main SLURM job script
-│   ├── processors/           # ML processing modules
+│   ├── ai/                   # Low-level ML model wrappers
+│   │   ├── layout/
+│   │   │   ├── model.py      # LayoutLMv3 wrapper
+│   │   │   └── inference.py  # Batch inference
+│   │   ├── alt_text/
+│   │   │   ├── model.py      # BLIP-2/LLaVA wrapper
+│   │   │   └── inference.py  # Image captioning
+│   │   └── tables/
+│   │       ├── model.py      # TAPAS wrapper
+│   │       └── inference.py  # Table parsing
+│   ├── processors/           # High-level business logic
 │   │   ├── __init__.py
-│   │   ├── layout.py         # Layout detection (LayoutLMv3/Donut)
-│   │   ├── alttext.py        # Alt-text generation (BLIP-2/LLaVA)
-│   │   ├── ocr.py            # OCR (Tesseract/PaddleOCR)
-│   │   ├── wcag.py           # WCAG compliance checking
+│   │   ├── layout.py         # Calls ai/layout, adds WCAG validation
+│   │   ├── alttext.py        # Calls ai/alt_text, ensures compliance
+│   │   ├── ocr.py            # OCR orchestration (external tools)
+│   │   ├── wcag.py           # Rule-based validation
 │   │   └── tagging.py        # PDF tagging (PyMuPDF/iText)
 │   └── pyproject.toml
 │
@@ -185,6 +201,9 @@ accessible-pdf-rocky/
 - **Language**: Python
 - **Purpose**: GPU-intensive ML processing (minutes to hours)
 - **Resources**: GPU nodes (A100/H100), 10s of GB RAM
+- **Architecture**: Two-layer separation of concerns
+  - `ai/` = Low-level ML model wrappers (loads models, runs inference)
+  - `processors/` = High-level business logic (validates, adds WCAG rules)
 - **Responsibilities**:
   - Layout detection (LayoutLMv3 - GPU intensive)
   - Alt-text generation (BLIP-2/LLaVA - GPU intensive)
@@ -192,7 +211,71 @@ accessible-pdf-rocky/
   - WCAG compliance checking
   - PDF tagging and remediation
 
-**Flow**: Frontend → Cloudflare Workers (fast API) → Queue → Controller → SLURM → HPC Runner (heavy ML on GPU) → Results → R2
+**Internal Flow:**
+
+1. `runner.py` orchestrates the pipeline
+2. Calls `ai/*` for raw ML predictions
+3. Passes to `processors/*` for validation and business logic
+4. Returns application-ready results
+
+**External Flow**: Frontend → Cloudflare Workers (fast API) → Queue → Controller → SLURM → HPC Runner (heavy ML on GPU) → Results → R2
+
+**Note:** See [SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md) for detailed architecture of the `ai/` vs `processors/` layers.
+
+### Understanding controller/services vs hpc_runner Overlap
+
+You'll notice some similar file names in both `controller/services/` and `hpc_runner/`. This is **intentional** - they serve different purposes at different stages:
+
+#### Where They Run
+
+**`controller/services/`** - Runs on FastAPI controller (lightweight VM/server)
+
+- **NOT on GPU nodes**
+- Orchestrates the overall flow between Cloudflare ↔ HPC ↔ R2
+- Does lightweight coordination work
+- No heavy ML processing
+
+**`hpc_runner/`** - Runs on HPC GPU nodes via SLURM
+
+- **ON GPU nodes with A100/H100**
+- Does heavy ML processing
+- Called by controller via SLURM submission
+
+#### The Overlap Cases
+
+| Functionality | controller/services/ | hpc_runner/ | Why Both? |
+|--------------|---------------------|-------------|----------|
+| **OCR** | `ocr_engine.py`<br/>Orchestrates OCR decisions<br/>"Should we OCR? Which engine?" | `processors/ocr.py`<br/>Actually RUNS OCR<br/>Heavy processing on GPU | Controller decides, HPC executes |
+| **WCAG** | `wcag_engine.py`<br/>Final validation after HPC<br/>Rule-based checks | `processors/wcag.py`<br/>WCAG checks during ML<br/>Validates predictions | Controller validates final output, HPC validates during processing |
+| **PDF Ops** | `pdf_builder.py`<br/>Final PDF assembly<br/>Builds output from results | `processors/tagging.py`<br/>PDF structure tagging<br/>Tags during processing | Controller builds final PDF, HPC adds semantic tags |
+
+#### Complete Flow Example
+
+```
+1. User uploads PDF
+   ↓
+2. Controller/services/pdf_normalizer detects PDF type
+   ↓
+3. Controller/services/ocr_engine decides: "This needs OCR"
+   ↓
+4. Controller submits SLURM job to HPC
+   ↓
+5. HPC runner.py starts:
+   a. hpc_runner/processors/ocr.py runs Tesseract (heavy)
+   b. hpc_runner/ai/layout runs LayoutLMv3 (heavy)
+   c. hpc_runner/processors/wcag validates predictions
+   d. hpc_runner/processors/tagging adds semantic tags
+   ↓
+6. Results return to controller
+   ↓
+7. Controller/services/wcag_engine final validation
+   ↓
+8. Controller/services/pdf_builder assembles output PDF
+   ↓
+9. Upload to R2
+```
+
+**Key Insight:** Controller services are lightweight orchestrators. HPC runners are heavy processors. Similar names, different purposes, different stages.
 
 ## Data Flow
 
@@ -308,6 +391,8 @@ uv run runner.py $PDF_PATH \
 
 #### hpc_runner/runner.py
 
+The runner orchestrates both the ML model layer (`ai/`) and business logic layer (`processors/`):
+
 ```python
 #!/usr/bin/env python3
 import argparse
@@ -316,15 +401,17 @@ from pathlib import Path
 
 def analyze_pdf(pdf_path: str, job_id: str) -> dict:
     """
-    Analyze a PDF file for accessibility issues.
+    Analyze a PDF file for accessibility issues using two-layer architecture.
     
-    This is where the heavy ML happens:
-    - Layout detection (LayoutLMv3/Donut)
+    Layer 1 (ai/): Raw ML model inference
+    - Layout detection (LayoutLMv3)
     - Alt-text generation (BLIP-2/LLaVA)
-    - Table extraction (TAPAS)
-    - OCR (Tesseract/PaddleOCR)
-    - WCAG enforcement
-    - PDF tagging
+    - Table parsing (TAPAS)
+    
+    Layer 2 (processors/): Business logic and validation
+    - WCAG compliance checking
+    - Result validation and cleanup
+    - PDF tagging and structure
     
     Args:
         pdf_path: Path to the PDF file to analyze
@@ -333,15 +420,34 @@ def analyze_pdf(pdf_path: str, job_id: str) -> dict:
     Returns:
         Dictionary containing analysis results
     """
-    # TODO: Implement actual PDF analysis
-    print(f"Analyzing PDF: {pdf_path}")
-    print(f"Job ID: {job_id}")
+    # Step 1: Get raw ML predictions from ai/ layer
+    from ai.layout.inference import run_layout_inference
+    from ai.alt_text.inference import generate_alt_texts
+    from ai.tables.inference import parse_tables
     
+    raw_layout = await run_layout_inference(pdf_path)
+    figures = extract_figures(raw_layout)
+    raw_alt_texts = await generate_alt_texts(figures)
+    tables = extract_tables(raw_layout)
+    raw_tables = await parse_tables(tables)
+    
+    # Step 2: Process with business logic via processors/
+    from processors.layout import analyze_reading_order
+    from processors.wcag import check_wcag_compliance
+    
+    validated_layout = analyze_reading_order(raw_layout)
+    wcag_issues = check_wcag_compliance(validated_layout)
+    
+    # Step 3: Return application-ready results
     return {
         "job_id": job_id,
         "pdf_path": pdf_path,
         "status": "completed",
-        "issues": []
+        "layout": validated_layout,
+        "reading_order": validated_layout["reading_order"],
+        "alt_texts": raw_alt_texts,
+        "tables": raw_tables,
+        "wcag_issues": wcag_issues
     }
 
 def main():

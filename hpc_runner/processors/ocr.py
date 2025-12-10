@@ -1,4 +1,8 @@
-"""OCR processing using Tesseract, PaddleOCR, or Azure OCR."""
+"""OCR processing using Tesseract, PaddleOCR, or Azure OCR.
+
+Note: This module directly calls OCR engines (no ai/ layer dependency).
+OCR engines are external tools, not ML models we wrap.
+"""
 
 from pathlib import Path
 

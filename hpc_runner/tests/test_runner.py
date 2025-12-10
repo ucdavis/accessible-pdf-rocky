@@ -18,15 +18,29 @@ def test_analyze_pdf():
     assert result["job_id"] == "job-123"
     assert result["pdf_path"] == "/fake/path.pdf"
     assert result["status"] == "completed"
-    assert "issues" in result
-    assert isinstance(result["issues"], list)
+    assert "layout" in result
+    assert "reading_order" in result
+    assert "alt_texts" in result
+    assert "tables" in result
+    assert "wcag_issues" in result
+    assert isinstance(result["wcag_issues"], list)
 
 
 def test_analyze_pdf_returns_dict():
     """Test that analyze_pdf returns a dictionary."""
     result = analyze_pdf("test.pdf", "test-job")
     assert isinstance(result, dict)
-    assert all(key in result for key in ["job_id", "pdf_path", "status", "issues"])
+    expected_keys = [
+        "job_id",
+        "pdf_path",
+        "status",
+        "layout",
+        "reading_order",
+        "alt_texts",
+        "tables",
+        "wcag_issues",
+    ]
+    assert all(key in result for key in expected_keys)
 
 
 def test_main_missing_pdf(monkeypatch, capsys):
