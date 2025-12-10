@@ -2,6 +2,10 @@
 
 Production-grade accessible PDF system with Cloudflare Workers, FastAPI, and HPC/SLURM integration.
 
+[![CI](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/ci.yml/badge.svg)](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/codeql.yml/badge.svg)](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/codeql.yml)
+[![Security Audit](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/security.yml/badge.svg)](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/security.yml)
+
 ## Status
 
 🚧 **Current Phase**: Project Scaffold  

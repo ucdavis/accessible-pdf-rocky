@@ -168,7 +168,7 @@ Tests run automatically on:
 
 ### GitHub Actions Workflows
 
-- `.github/workflows/test.yml` - Main test workflow
+- `.github/workflows/ci.yml` - Main CI workflow (tests + linting)
 - `.github/workflows/security.yml` - Security audits
 - `.github/workflows/codeql.yml` - Code security scanning
 
