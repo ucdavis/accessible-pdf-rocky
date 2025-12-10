@@ -7,35 +7,31 @@ import JobStatusBadge from "../JobStatusBadge";
 import UploadForm from "../UploadForm";
 
 describe("JobStatusBadge", () => {
-  test("imports successfully", () => {
-    expect(JobStatusBadge).toBeDefined();
-  });
-
   test("renders submitted status correctly", () => {
     render(<JobStatusBadge status="submitted" />);
     const badge = screen.getByText("submitted");
-    expect(badge).toBeDefined();
+    expect(badge).toBeInTheDocument();
     expect(badge.className).toContain("bg-zinc-200");
   });
 
   test("renders running status with blue styling", () => {
     render(<JobStatusBadge status="running" />);
     const badge = screen.getByText("running");
-    expect(badge).toBeDefined();
+    expect(badge).toBeInTheDocument();
     expect(badge.className).toContain("bg-blue-100");
   });
 
   test("renders completed status with green styling", () => {
     render(<JobStatusBadge status="completed" />);
     const badge = screen.getByText("completed");
-    expect(badge).toBeDefined();
+    expect(badge).toBeInTheDocument();
     expect(badge.className).toContain("bg-green-100");
   });
 
   test("renders failed status with red styling", () => {
     render(<JobStatusBadge status="failed" />);
     const badge = screen.getByText("failed");
-    expect(badge).toBeDefined();
+    expect(badge).toBeInTheDocument();
     expect(badge.className).toContain("bg-red-100");
   });
 
@@ -49,26 +45,22 @@ describe("JobStatusBadge", () => {
 });
 
 describe("UploadForm", () => {
-  test("imports successfully", () => {
-    expect(UploadForm).toBeDefined();
-  });
-
   test("renders the upload area with descriptive text", () => {
     render(<UploadForm />);
     const text = screen.getByText(/Drag and drop your PDF here/i);
-    expect(text).toBeDefined();
+    expect(text).toBeInTheDocument();
   });
 
   test("displays PDF file type restriction", () => {
     render(<UploadForm />);
     const restriction = screen.getByText(/PDF files only/i);
-    expect(restriction).toBeDefined();
+    expect(restriction).toBeInTheDocument();
   });
 
   test("renders upload icon with proper aria-hidden attribute", () => {
     const { container } = render(<UploadForm />);
     const icon = container.querySelector('svg[aria-hidden="true"]');
-    expect(icon).toBeDefined();
+    expect(icon).not.toBeNull();
   });
 
   test("displays disabled upload button with coming soon message", () => {
@@ -76,22 +68,22 @@ describe("UploadForm", () => {
     const button = screen.getByRole("button", {
       name: /Upload functionality coming soon/i,
     });
-    expect(button).toBeDefined();
-    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button).toBeInTheDocument();
+    expect(button).toBeDisabled();
   });
 
-  test("renders without crashing", () => {
-    const { container } = render(<UploadForm />);
-    expect(container).toBeTruthy();
-  });
-
-  // TODO: Add tests for future upload functionality:
-  // - Handles file selection via input
-  // - Handles drag and drop file upload
-  // - Validates file type (PDF only)
-  // - Validates file size limits
-  // - Submits form with valid file
-  // - Displays upload progress indicator
-  // - Handles submission errors
-  // - Navigates to job status page on success
+  /**
+   * TODO: Add tests for future upload functionality
+   * Track progress in GitHub issue #TBD
+   *
+   * Planned test coverage:
+   * - Handles file selection via input
+   * - Handles drag and drop file upload
+   * - Validates file type (PDF only)
+   * - Validates file size limits
+   * - Submits form with valid file
+   * - Displays upload progress indicator
+   * - Handles submission errors
+   * - Navigates to job status page on success
+   */
 });

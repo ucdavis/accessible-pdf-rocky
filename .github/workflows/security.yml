@@ -2,9 +2,9 @@ name: Security Audit
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   schedule:
     - cron: '0 0 * * 0'  # Weekly on Sunday at midnight UTC
 
@@ -17,12 +17,12 @@ jobs:
         directory: [frontend, workers]
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '20'
-      
+
       - name: Run npm audit
         working-directory: ./${{ matrix.directory }}
         run: |
@@ -37,18 +37,18 @@ jobs:
         directory: [controller, hpc_runner]
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
-      
+
       - name: Set up Python
         run: uv python install
         working-directory: ./${{ matrix.directory }}
-      
+
       - name: Install dependencies
         working-directory: ./${{ matrix.directory }}
         run: uv sync
-      
+
       - name: Run pip-audit
         working-directory: ./${{ matrix.directory }}
         run: |

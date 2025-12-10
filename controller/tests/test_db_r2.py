@@ -1,8 +1,12 @@
 """Tests for controller db and r2 modules."""
 
+import sys
 from pathlib import Path
 
 import pytest
+
+# Add parent directory to path to import db and r2 modules
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 class TestDBModels:
@@ -52,29 +56,29 @@ class TestDBSession:
         assert session is not None
 
     def test_get_db_connection_exists(self):
-        """Test that get_db_connection function exists and returns None."""
+        """Test that get_db_connection function exists and is callable."""
         from db.session import get_db_connection
 
-        # Currently returns None (not implemented)
-        result = get_db_connection()
-        assert result is None
+        # Currently unimplemented; ensure it is callable and does not raise
+        # TODO: Once implemented, this should return a database connection object
+        get_db_connection()
 
     def test_db_session_exists(self):
-        """Test that db_session function exists and returns None."""
+        """Test that db_session function exists and is callable."""
         from db.session import db_session
 
-        # Currently returns None (not implemented)
-        result = db_session()
-        assert result is None
+        # Currently unimplemented; ensure it is callable and does not raise
+        # TODO: Once implemented, this should return a context manager
+        db_session()
 
     @pytest.mark.asyncio
     async def test_init_db_exists(self):
-        """Test that init_db async function exists and returns None."""
+        """Test that init_db async function exists and is callable."""
         from db.session import init_db
 
-        # Currently returns None (not implemented)
-        result = await init_db()
-        assert result is None
+        # Currently unimplemented; ensure it is callable and does not raise
+        # TODO: Once implemented, verify database initialization behavior
+        await init_db()
 
 
 class TestR2Download:
@@ -98,13 +102,21 @@ class TestR2Download:
 
     @pytest.mark.asyncio
     async def test_download_pdf_creates_directory_structure(self):
-        """Test that download_pdf creates proper directory structure before calling download_file."""
+        """Test that download_pdf creates /tmp/pdfs/{job_id}.pdf before calling download_file."""
+        from unittest.mock import AsyncMock, patch
+
         from r2.download import download_pdf
 
-        # download_pdf calls download_file which raises NotImplementedError,
-        # but we can verify the path structure logic
-        with pytest.raises(NotImplementedError):
+        with patch(
+            "r2.download.download_file", new_callable=AsyncMock
+        ) as mock_download:
+            mock_download.return_value = Path("/tmp/pdfs/job123.pdf")
             await download_pdf("job123", "uploads/test.pdf")
+
+        # Verify the local path parent directory is /tmp/pdfs
+        local_path = mock_download.call_args[0][1]
+        assert local_path.parent == Path("/tmp/pdfs")
+        assert local_path.name == "job123.pdf"
 
     @pytest.mark.asyncio
     async def test_download_pdf_uses_correct_path_pattern(self):
@@ -124,7 +136,7 @@ class TestR2Download:
             mock_download.assert_called_once()
             call_args = mock_download.call_args
             assert call_args[0][0] == "uploads/test.pdf"  # r2_key
-            assert str(call_args[0][1]) == "/tmp/pdfs/job456.pdf"  # local_path
+            assert call_args[0][1] == Path("/tmp/pdfs/job456.pdf")  # local_path
             assert result == Path("/tmp/pdfs/job456.pdf")
 
 

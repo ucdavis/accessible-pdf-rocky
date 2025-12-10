@@ -57,6 +57,8 @@ just help
 - [Development Guide](docs/DEVELOPMENT.md) - Setup and workflows
 - [MVP Roadmap](docs/MVP_ROADMAP.md) - Path to functional prototype
 - [System Design](docs/SYSTEM_DESIGN.md) - Technical decisions
+- [Testing Strategy](docs/TESTING.md) - Test coverage and approach
+- [Why This Project?](docs/WHY.md) - Problem statement and rationale
 
 ## MVP Progress
 

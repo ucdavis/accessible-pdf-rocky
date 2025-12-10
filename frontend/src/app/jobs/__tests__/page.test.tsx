@@ -6,15 +6,13 @@ import { render, screen } from "@testing-library/react";
 import Jobs from "../page";
 
 describe("Jobs page", () => {
-  test("imports successfully", async () => {
-    const jobsPage = await import("../page");
-    expect(jobsPage).toBeDefined();
-  });
-
   test("renders the page heading", () => {
     render(<Jobs />);
-    const heading = screen.getByRole("heading", { name: /Processing Jobs/i });
-    expect(heading).toBeDefined();
+    const heading = screen.getByRole("heading", {
+      level: 1,
+      name: /Processing Jobs/i,
+    });
+    expect(heading).toBeInTheDocument();
   });
 
   test("renders the page description", () => {
@@ -22,7 +20,7 @@ describe("Jobs page", () => {
     const description = screen.getByText(
       /View status of your PDF accessibility checks/i
     );
-    expect(description).toBeDefined();
+    expect(description).toBeInTheDocument();
   });
 
   test("displays empty state message when no jobs exist", () => {
@@ -30,25 +28,25 @@ describe("Jobs page", () => {
     const emptyMessage = screen.getByText(
       /No jobs yet. Upload a PDF to get started./i
     );
-    expect(emptyMessage).toBeDefined();
-  });
-
-  test("renders without crashing", () => {
-    const { container } = render(<Jobs />);
-    expect(container).toBeTruthy();
+    expect(emptyMessage).toBeInTheDocument();
   });
 
   test("has proper semantic structure with main element", () => {
     render(<Jobs />);
     const main = screen.getByRole("main");
-    expect(main).toBeDefined();
+    expect(main).toBeInTheDocument();
   });
 
-  // TODO: Add tests for future API integration:
-  // - Fetches and displays jobs from API
-  // - Displays job statuses with JobStatusBadge
-  // - Handles loading state during fetch
-  // - Links to individual job details
-  // - Handles fetch errors gracefully
-  // - Auto-refreshes for running jobs
+  /**
+   * TODO: Add tests for future API integration
+   * Track progress in GitHub issue #TBD
+   *
+   * Planned test coverage:
+   * - Fetches and displays jobs from API
+   * - Displays job statuses with JobStatusBadge component
+   * - Handles loading state during fetch
+   * - Links to individual job details pages
+   * - Handles fetch errors gracefully with error messages
+   * - Auto-refreshes job list for running jobs
+   */
 });

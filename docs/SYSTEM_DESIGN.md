@@ -662,8 +662,14 @@ flowchart TD
 
 ## Frontend Features
 
+### Authentication
+
+- **Required:** UC Davis campus account login via EntraID (Microsoft Azure AD)
+- All features require authenticated session
+
 ### Pages
 
+- `/` - Landing page (login redirect if unauthenticated)
 - `/upload` - PDF upload with drag-and-drop
 - `/documents/[id]` - Document dashboard
 - `/documents/[id]/review` - Accessibility review editor
@@ -798,6 +804,16 @@ CREATE TABLE alt_texts (
 /reports/{job_id}/compliance.json   # WCAG report
 ```
 
+### Optional Box Integration
+
+**Future Feature:** Automatic upload of results to user's Box folder
+
+- OAuth integration with Box API
+- User grants permission to write to their Box account
+- Results automatically saved to `/Accessible PDFs/{job_id}/`
+- User maintains full control via Box sharing and permissions
+- Falls back to R2 download if Box integration not enabled
+
 ## Model Training Pipeline
 
 ### 1. Dataset Preparation
@@ -847,11 +863,14 @@ python scripts/benchmark.py \
 
 ## Security & Privacy
 
+- **Authentication** - UC Davis campus account required (EntraID/Azure AD integration)
+- **Authorization** - Users can only access their own jobs and results
 - **PDF sanitization** - Remove embedded scripts, forms, JavaScript
 - **Content isolation** - Each job in separate container
 - **PII detection** - Flag sensitive content (SSN, credit cards)
 - **Access control** - Signed URLs with expiration
 - **Audit logging** - All AI decisions logged for review
+- **Box integration** - Optional, user-controlled OAuth with write permissions
 
 ## Future Enhancements
 
