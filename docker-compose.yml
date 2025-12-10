@@ -7,11 +7,14 @@ services:
     ports:
       - "8000:8000"
     environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
       DB_API_URL: ${DB_API_URL:-http://localhost:8787}
       DB_API_TOKEN: ${DB_API_TOKEN:-dev-token}
       STORAGE_MODE: ${STORAGE_MODE:-local}
       STORAGE_PATH: ${STORAGE_PATH:-/app/storage}
       QUEUE_MODE: ${QUEUE_MODE:-direct}
+      METRICS_ENDPOINT: ${METRICS_ENDPOINT:-http://localhost:8787/ingest}
+      METRICS_TOKEN: ${METRICS_TOKEN:-dev-token}
     volumes:
       - ./controller:/app
       - storage_data:/app/storage

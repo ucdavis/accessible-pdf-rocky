@@ -12,6 +12,15 @@ database_id = "" # Will be filled after running: wrangler d1 create metrics-db
 # Secrets (set with: wrangler secret put METRICS_AUTH_TOKEN)
 # METRICS_AUTH_TOKEN = ""
 
+# Environment variables
+# [vars]
+# METRICS_RETENTION_DAYS = "7"  # Optional: defaults to 7 days
+
+# Cron trigger for automated data retention
+# Runs daily at 2 AM UTC to clean up old metrics
+[triggers]
+crons = ["0 2 * * *"]
+
 # Routes (customize based on your domain)
 # routes = [
 #   { pattern = "metrics.your-domain.com/*", zone_name = "your-domain.com" }

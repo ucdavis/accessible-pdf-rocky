@@ -10,3 +10,7 @@ database_id = "" # Set this after running: npm run db:create
 
 # Secrets (set with: wrangler secret put DB_AUTH_TOKEN)
 # DB_AUTH_TOKEN = ""
+
+# Environment variables (optional)
+# [vars]
+# ALLOWED_ORIGIN = "https://your-controller-domain.com"  # Restrict CORS in production, defaults to '*'

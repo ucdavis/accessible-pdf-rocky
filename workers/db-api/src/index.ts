@@ -8,6 +8,20 @@
 export interface Env {
 	JOBS_DB: D1Database;
 	DB_AUTH_TOKEN: string;
+	ALLOWED_ORIGIN?: string; // Optional, defaults to '*' for development
+}
+
+/**
+ * Timing-safe string comparison to prevent timing attacks.
+ * Compares two strings in constant time regardless of where they differ.
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+	if (a.length !== b.length) return false;
+	let result = 0;
+	for (let i = 0; i < a.length; i++) {
+		result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+	}
+	return result === 0;
 }
 
 interface Job {
@@ -46,8 +60,9 @@ export default {
 		const url = new URL(request.url);
 
 		// CORS headers
+		// Note: ALLOWED_ORIGIN can be set via environment variable for production
 		const corsHeaders = {
-			'Access-Control-Allow-Origin': '*',
+			'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || '*',
 			'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 			'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 		};
@@ -56,9 +71,10 @@ export default {
 			return new Response(null, { headers: corsHeaders });
 		}
 
-		// Authentication
+		// Authentication (using timing-safe comparison)
 		const authHeader = request.headers.get('Authorization');
-		if (!authHeader || authHeader !== `Bearer ${env.DB_AUTH_TOKEN}`) {
+		const expectedToken = `Bearer ${env.DB_AUTH_TOKEN}`;
+		if (!authHeader || !timingSafeEqual(authHeader, expectedToken)) {
 			return new Response('Unauthorized', { status: 401, headers: corsHeaders });
 		}
 
@@ -105,10 +121,11 @@ export default {
 				return await createMetric(request, env, corsHeaders);
 			}
 
-			return new Response('Not Found', { status: 404, headers: corsHeaders });
+		return new Response('Not Found', { status: 404, headers: corsHeaders });
 		} catch (error) {
 			console.error('Error handling request:', error);
-			return new Response(`Internal Server Error: ${(error as Error).message}`, {
+			const message = error instanceof Error ? error.message : 'Unknown error';
+			return new Response(`Internal Server Error: ${message}`, {
 				status: 500,
 				headers: corsHeaders,
 			});
@@ -155,7 +172,11 @@ async function getJob(jobId: string, env: Env, corsHeaders: Record<string, strin
 async function listJobs(url: URL, env: Env, corsHeaders: Record<string, string>): Promise<Response> {
 	const status = url.searchParams.get('status');
 	const userId = url.searchParams.get('user_id');
-	const limit = parseInt(url.searchParams.get('limit') || '100');
+	
+	// Validate and cap limit parameter
+	const MAX_LIMIT = 1000;
+	const parsedLimit = parseInt(url.searchParams.get('limit') || '100', 10);
+	const limit = Number.isNaN(parsedLimit) ? 100 : Math.min(Math.max(1, parsedLimit), MAX_LIMIT);
 
 	let query = 'SELECT * FROM jobs WHERE 1=1';
 	const params: (string | number)[] = [];
@@ -260,6 +281,12 @@ async function createMetric(request: Request, env: Env, corsHeaders: Record<stri
 
 	if (!metric.id || !metric.job_id) {
 		return new Response('Missing required fields: id, job_id', { status: 400, headers: corsHeaders });
+	}
+
+	// Verify job exists to prevent orphaned metrics
+	const { results } = await env.JOBS_DB.prepare('SELECT id FROM jobs WHERE id = ?').bind(metric.job_id).all();
+	if (!results || results.length === 0) {
+		return new Response('Referenced job_id not found', { status: 400, headers: corsHeaders });
 	}
 
 	const now = Math.floor(Date.now() / 1000);

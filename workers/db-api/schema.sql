@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     results_url TEXT,
-    user_id TEXT
+    user_id TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_jobs_slurm_id ON jobs(slurm_id);

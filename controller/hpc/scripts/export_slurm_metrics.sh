@@ -27,6 +27,12 @@ if [ -z "$METRICS_TOKEN" ]; then
 	exit 1
 fi
 
+if [[ "$METRICS_ENDPOINT" == *"your-domain"* ]]; then
+	echo "ERROR: METRICS_ENDPOINT still contains placeholder (your-domain)" >&2
+	echo "ERROR: Set METRICS_ENDPOINT environment variable to your actual Cloudflare Worker URL" >&2
+	exit 1
+fi
+
 # Collect SLURM metrics
 PENDING=$(squeue -t PENDING -h 2>/dev/null | wc -l || echo 0)
 RUNNING=$(squeue -t RUNNING -h 2>/dev/null | wc -l || echo 0)
@@ -64,21 +70,20 @@ PAYLOAD=$(
 EOF
 )
 
-# Push metrics to Cloudflare Worker
-RESPONSE=$(curl -X POST "${METRICS_ENDPOINT}" \
+# Push metrics to Cloudflare Worker (capture HTTP code separately)
+HTTP_CODE=$(curl -X POST "${METRICS_ENDPOINT}" \
 	-H "Authorization: Bearer ${METRICS_TOKEN}" \
 	-H "Content-Type: application/json" \
 	-d "${PAYLOAD}" \
 	--max-time 10 \
 	--silent \
 	--show-error \
-	--write-out "\nHTTP_CODE:%{http_code}" 2>&1)
+	--write-out "%{http_code}" \
+	-o /dev/null 2>&1)
 
 # Check response
-HTTP_CODE=$(echo "$RESPONSE" | grep -o "HTTP_CODE:[0-9]*" | cut -d: -f2)
 if [ "${HTTP_CODE:-000}" -ne 200 ]; then
-	echo "ERROR: Failed to push metrics (HTTP ${HTTP_CODE})" >&2
-	echo "$RESPONSE" >&2
+	echo "ERROR: Failed to push metrics to ${METRICS_ENDPOINT} (HTTP ${HTTP_CODE})" >&2
 	exit 1
 fi
 

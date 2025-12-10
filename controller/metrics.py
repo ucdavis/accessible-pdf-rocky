@@ -5,11 +5,14 @@ exposing a Prometheus endpoint. This eliminates the need for inbound
 connections to the FastAPI controller.
 """
 
+import logging
 import os
 from datetime import datetime
 from typing import Optional
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class MetricsClient:
@@ -22,6 +25,13 @@ class MetricsClient:
         self.token = os.getenv("METRICS_TOKEN", "")
         self.source = "fastapi"
         self._client: Optional[httpx.AsyncClient] = None
+
+        # Warn about placeholder endpoint
+        if "your-domain" in self.endpoint:
+            logger.warning(
+                "METRICS_ENDPOINT is using placeholder value. "
+                "Set METRICS_ENDPOINT environment variable to your actual Cloudflare Worker URL."
+            )
 
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create HTTP client."""
@@ -40,12 +50,16 @@ class MetricsClient:
             impacting application functionality.
         """
         if not self.token:
-            # Silently skip if not configured
+            # Skip if not configured
+            logger.debug("Metrics push skipped: METRICS_TOKEN not configured")
             return
 
+        # Note: Using second precision for timestamps. For high-frequency metrics
+        # (multiple submissions per second), later submissions will overwrite earlier
+        # ones in the database. This is acceptable for aggregate metrics.
         payload = {
             "source": self.source,
-            "timestamp": int(datetime.now().timestamp()),
+            "timestamp": int(datetime.now().timestamp()),  # Unix seconds
             "metrics": metrics,
         }
 
@@ -59,7 +73,7 @@ class MetricsClient:
             response.raise_for_status()
         except Exception as e:
             # Don't fail the request if metrics push fails
-            print(f"Failed to push metrics: {e}")
+            logger.error(f"Failed to push metrics: {e}", exc_info=True)
 
     async def close(self) -> None:
         """Close HTTP client."""
@@ -97,13 +111,16 @@ async def close_metrics_client() -> None:
 
 async def record_job_submission(success: bool, latency: float) -> None:
     """Record job submission attempt."""
-    await push_metrics(
-        {
-            "slurm_submitted_jobs_total": 1,
-            "slurm_submission_latency_seconds": latency,
-            "slurm_submission_success" if success else "slurm_submission_failure": 1,
-        }
-    )
+    metrics = {
+        "slurm_submitted_jobs_total": 1,
+        "slurm_submission_latency_seconds": latency,
+    }
+    if success:
+        metrics["slurm_submission_success"] = 1
+    else:
+        metrics["slurm_submission_failure"] = 1
+
+    await push_metrics(metrics)
 
 
 async def record_job_failure(error_type: str) -> None:

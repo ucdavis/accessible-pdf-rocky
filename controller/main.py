@@ -1,39 +1,54 @@
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from uuid import UUID
 
+import httpx
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 
-from db.client import get_db_client
+from db.client import close_db_client, get_db_client
+from db.models import Job, JobStatus
 from metrics import close_metrics_client
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize on startup and cleanup on shutdown."""
+    """Application lifespan handler for cleanup on shutdown."""
     yield
-    # Close metrics client on shutdown
+    # Close clients on shutdown
     await close_metrics_client()
+    await close_db_client()
 
 
 app = FastAPI(lifespan=lifespan)
 
 
-class JobStatusResponse(BaseModel):
-    job_id: str
-    status: str
+@app.get("/status/{job_id}", response_model=Job)
+async def get_status(job_id: UUID) -> Job:
+    """Get job status from database.
 
-
-@app.get("/status/{job_id}", response_model=JobStatusResponse)
-async def get_status(job_id: UUID) -> JobStatusResponse:
-    """Get job status from database."""
+    Returns job with camelCase field names for frontend compatibility.
+    """
     db = get_db_client()
 
     try:
-        job = await db.get_job(job_id)
-        return JobStatusResponse(job_id=job["id"], status=job["status"])
-    except Exception as e:
-        # Handle 404 or other errors
-        if "404" in str(e) or "not found" in str(e).lower():
+        job_data = await db.get_job(job_id)
+        # Convert timestamps from Unix seconds to datetime
+        return Job(
+            id=UUID(job_data["id"]),
+            slurm_id=job_data.get("slurm_id"),
+            status=JobStatus(job_data["status"]),
+            r2_key=job_data["r2_key"],
+            created_at=datetime.fromtimestamp(job_data["created_at"], tz=timezone.utc),
+            updated_at=datetime.fromtimestamp(job_data["updated_at"], tz=timezone.utc),
+            results_url=job_data.get("results_url"),
+            user_id=UUID(job_data["user_id"]) if job_data.get("user_id") else None,
+            error=None,  # TODO: Add error tracking to database
+        )
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
             raise HTTPException(status_code=404, detail="Job not found")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=e.response.status_code, detail=str(e))
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=503, detail=f"Database service unavailable: {e}"
+        )

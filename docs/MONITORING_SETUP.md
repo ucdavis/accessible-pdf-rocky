@@ -14,112 +14,90 @@ We monitor three layers:
 
 ```mermaid
 flowchart TD
-    Prometheus["Prometheus + Grafana<br/>Scrapes every 15-60s"] -->|/metrics| FastAPI
-    Prometheus -->|/metrics| HPC
+    Prometheus["Prometheus + Grafana<br/>Scrapes every 15-60s"] -->|/metrics| MetricsWorker
     Prometheus -->|:9100| NodeExporter
     
-    FastAPI["FastAPI Controller<br/>/metrics endpoint<br/>• Job submission stats<br/>• Queue depth<br/>• R2 URL generation"]
+    FastAPI["FastAPI Controller<br/>Pushes metrics"] -->|HTTPS POST| MetricsWorker
+    HPC["HPC SLURM Export<br/>Pushes metrics"] -->|HTTPS POST| MetricsWorker
     
-    HPC["HPC SLURM<br/>/metrics via Node Exporter<br/>• Job states<br/>• Queue backlog<br/>• Node availability"]
+    MetricsWorker["Cloudflare Worker<br/>metrics-ingest<br/>• Stores in D1<br/>• Exposes /metrics endpoint"]
     
     NodeExporter["Node Exporter<br/>:9100<br/>• System resources<br/>• CPU/Memory/Disk<br/>• Network stats"]
     
     style Prometheus fill:#ffeb99,stroke:#cc9900,stroke-width:3px,color:#000
     style FastAPI fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
     style HPC fill:#ff9999,stroke:#cc0000,stroke-width:3px,color:#000
+    style MetricsWorker fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
     style NodeExporter fill:#e6ccff,stroke:#9933ff,stroke-width:3px,color:#000
 ```
 
 ## FastAPI Controller Metrics
 
-### FastAPI Setup
+### Architecture Note
 
-```bash
-# Install Prometheus client
-cd controller
-uv add prometheus-client
-```
-
-The `/metrics` endpoint is already configured in `controller/main.py`.
+The FastAPI controller uses **push-based metrics** to a Cloudflare Worker instead of exposing a `/metrics` endpoint. This eliminates the need for inbound connections to the controller (important when behind HPC firewalls). See [Metrics Deployment](METRICS_DEPLOYMENT.md) for the full architecture.
 
 ### Available Metrics
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `slurm_submitted_jobs_total` | Counter | Total jobs submitted (labels: status) |
-| `slurm_submission_failures_total` | Counter | Failed submissions (labels: error_type) |
-| `slurm_submission_latency_seconds` | Histogram | Time to submit job |
+| `slurm_submitted_jobs_total` | Counter | Total jobs submitted |
+| `slurm_submission_failures_total` | Counter | Failed submissions |
+| `slurm_submission_latency_seconds` | Gauge | Time to submit job (latest value) |
 | `slurm_pending_jobs` | Gauge | Jobs in PENDING state |
 | `slurm_running_jobs` | Gauge | Jobs in RUNNING state |
 | `slurm_completed_jobs` | Gauge | Jobs in COMPLETED state |
 | `slurm_failed_jobs` | Gauge | Jobs in FAILED state |
-| `slurm_job_duration_seconds` | Histogram | Time from submit to complete |
-| `slurm_status_check_seconds` | Histogram | Time to query job status |
-| `r2_presigned_url_generation_seconds` | Histogram | Time to generate URLs |
+| `slurm_job_duration_seconds` | Gauge | Time from submit to complete (latest value) |
+| `slurm_status_check_seconds` | Gauge | Time to query job status (latest value) |
+| `r2_presigned_url_generation_seconds` | Gauge | Time to generate URLs (latest value) |
 | `cloudflare_queue_depth` | Gauge | Messages in Cloudflare Queue |
 
-### Test Endpoint
+**Note**: Current implementation uses simple gauges for latency metrics. For histogram support with percentile calculations, the metrics-ingest worker would need to aggregate buckets. This could be added in the future if needed.
+
+### Metrics Collection
+
+Metrics are automatically pushed to the Cloudflare Worker endpoint when configured:
 
 ```bash
-curl http://localhost:8000/metrics
+# In controller/.env
+METRICS_ENDPOINT=https://metrics.your-domain.workers.dev/ingest
+METRICS_TOKEN=your-secret-token
 ```
 
-Expected output:
+Prometheus scrapes metrics from the Worker's `/metrics` endpoint:
 
+```bash
+curl https://metrics.your-domain.workers.dev/metrics
 ```
-# HELP slurm_submitted_jobs_total Total number of jobs submitted to Slurm
-# TYPE slurm_submitted_jobs_total counter
-slurm_submitted_jobs_total{status="success"} 42.0
-...
-```
+
+See [Metrics Deployment](METRICS_DEPLOYMENT.md) for setup instructions.
 
 ## HPC SLURM Metrics
 
 ### Installation (on HPC login node)
 
 ```bash
-# 1. Install Node Exporter
-wget https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz
-tar xvfz node_exporter-*.tar.gz
-sudo cp node_exporter-*/node_exporter /usr/local/bin/
-sudo chown root:root /usr/local/bin/node_exporter
-
-# 2. Create textfile collector directory
-sudo mkdir -p /var/lib/node_exporter/textfile_collector
-sudo chown nobody:nobody /var/lib/node_exporter/textfile_collector
-
-# 3. Install SLURM metrics export script
+# 1. Install SLURM metrics export script
 sudo cp controller/hpc/scripts/export_slurm_metrics.sh /usr/local/bin/
 sudo chmod 755 /usr/local/bin/export_slurm_metrics.sh
 sudo chown root:root /usr/local/bin/export_slurm_metrics.sh
 
-# 4. Add to cron (run every minute)
+# 2. Configure metrics endpoint (secure location)
+sudo mkdir -p /etc/slurm-metrics
+sudo tee /etc/slurm-metrics/config <<EOF
+export METRICS_ENDPOINT="https://metrics.your-domain.workers.dev/ingest"
+export METRICS_TOKEN="your-secure-token-here"
+EOF
+sudo chmod 600 /etc/slurm-metrics/config
+
+# 3. Add to crontab (run every minute)
 sudo crontab -e
 # Add line:
-* * * * * /usr/local/bin/export_slurm_metrics.sh
-
-# 5. Create systemd service for Node Exporter
-sudo tee /etc/systemd/system/node_exporter.service <<EOF
-[Unit]
-Description=Prometheus Node Exporter
-After=network.target
-
-[Service]
-Type=simple
-User=nobody
-ExecStart=/usr/local/bin/node_exporter \\
-  --collector.textfile.directory=/var/lib/node_exporter/textfile_collector
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# 6. Start Node Exporter
-sudo systemctl daemon-reload
-sudo systemctl enable node_exporter
-sudo systemctl start node_exporter
+* * * * * source /etc/slurm-metrics/config && /usr/local/bin/export_slurm_metrics.sh
 ```
+
+**Architecture Note**: Unlike traditional Node Exporter textfile collection, this uses push-based metrics to eliminate the need for inbound connections to the HPC cluster. The script pushes directly to the Cloudflare Worker.
 
 ### Available SLURM Metrics
 
@@ -138,11 +116,12 @@ sudo systemctl start node_exporter
 ### Test Metrics
 
 ```bash
-# Check metrics file
-cat /var/lib/node_exporter/textfile_collector/slurm_metrics.prom
+# Test the export script manually
+source /etc/slurm-metrics/config
+/usr/local/bin/export_slurm_metrics.sh
 
-# Test Node Exporter endpoint
-curl http://hpc-login:9100/metrics | grep slurm_
+# Verify metrics in Cloudflare Worker
+curl https://metrics.your-domain.workers.dev/metrics | grep slurm_
 ```
 
 ## Prometheus Configuration
@@ -152,7 +131,7 @@ curl http://hpc-login:9100/metrics | grep slurm_
 ```bash
 # On monitoring server
 wget https://github.com/prometheus/prometheus/releases/download/v2.48.0/prometheus-2.48.0.linux-amd64.tar.gz
-tar xvfz prometheus-*.tar.gz
+tar -xzf prometheus-*.tar.gz
 sudo cp prometheus-*/prometheus /usr/local/bin/
 sudo cp prometheus-*/promtool /usr/local/bin/
 ```
@@ -165,21 +144,17 @@ global:
   evaluation_interval: 30s
 
 scrape_configs:
-  # FastAPI Controller
-  - job_name: 'fastapi'
+  # Cloudflare Worker (FastAPI + HPC metrics)
+  - job_name: 'metrics-worker'
     static_configs:
-      - targets: ['fastapi.internal:8000']
+      - targets: ['metrics.your-domain.workers.dev']
     metrics_path: '/metrics'
+    scheme: https
 
-  # HPC SLURM (via Node Exporter)
-  - job_name: 'hpc-slurm'
-    static_configs:
-      - targets: ['hpc-login.ucdavis.edu:9100']
-
-  # Additional node exporters (optional)
+  # Optional: Node Exporter on controller/HPC for system metrics
   - job_name: 'node'
     static_configs:
-      - targets: ['fastapi.internal:9100']
+      - targets: ['fastapi.internal:9100', 'hpc-login.ucdavis.edu:9100']
 ```
 
 ### Start Prometheus
@@ -235,23 +210,23 @@ groups:
 
       # Slow job submission
       - alert: SlowJobSubmission
-        expr: histogram_quantile(0.95, rate(slurm_submission_latency_seconds_bucket[5m])) > 5
+        expr: slurm_submission_latency_seconds > 5
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "Slow job submission latency"
-          description: "95th percentile submission time >5s"
+          description: "Job submission taking >5s (current: {{ $value }}s)"
 
-      # FastAPI down
-      - alert: FastAPIDown
-        expr: up{job="fastapi"} == 0
+      # Metrics worker down
+      - alert: MetricsWorkerDown
+        expr: up{job="metrics-worker"} == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "FastAPI controller is down"
-          description: "FastAPI /metrics endpoint unreachable"
+          summary: "Metrics collection is down"
+          description: "Cloudflare Worker /metrics endpoint unreachable"
 ```
 
 Load alerts:
@@ -300,11 +275,13 @@ slurm_completed_jobs
 slurm_failed_jobs
 ```
 
-#### Panel 3: Submission Latency (95th percentile)
+#### Panel 3: Submission Latency (latest)
 
 ```promql
-histogram_quantile(0.95, rate(slurm_submission_latency_seconds_bucket[5m]))
+slurm_submission_latency_seconds
 ```
+
+**Note**: For percentile calculations, you would need to implement histogram bucketing in the metrics-ingest worker.
 
 #### Panel 4: Node Availability
 
@@ -332,11 +309,13 @@ A complete dashboard JSON is available in `docs/grafana-dashboard.json`.
 increase(slurm_submitted_jobs_total[1h])
 ```
 
-### Average job duration
+### Current job duration
 
 ```promql
-rate(slurm_job_duration_seconds_sum[1h]) / rate(slurm_job_duration_seconds_count[1h])
+slurm_job_duration_seconds
 ```
+
+**Note**: The current implementation provides the latest duration value. For average calculations over time, you would need to use `avg_over_time(slurm_job_duration_seconds[1h])`.
 
 ### Success rate
 
@@ -354,7 +333,7 @@ slurm_gpu_running_jobs / (slurm_gpu_running_jobs + slurm_gpu_pending_jobs)
 
 ### Log Rotation
 
-Prometheus data grows over time. Set retention:
+Prometheus data grows over time. By default, Prometheus retains data for 15 days. To customize retention:
 
 ```bash
 prometheus --storage.tsdb.retention.time=30d

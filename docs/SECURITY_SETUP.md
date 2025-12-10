@@ -132,7 +132,7 @@ FastAPI will:
 1. Generate job-specific script with environment variables
 2. Upload via SFTP to `/home/slurm_submit/jobs/job_<uuid>.sh`
 3. Call wrapper via SSH to submit script
-4. Cleanup script after submission
+4. Clean up script after submission
 
 ## Security Validation
 

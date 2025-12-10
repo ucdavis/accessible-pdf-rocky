@@ -147,6 +147,32 @@ Set via Wrangler secrets:
 
 - `METRICS_AUTH_TOKEN` - Bearer token for authentication
 
+Optional variables (set in `wrangler.toml` under `[vars]`):
+
+- `METRICS_RETENTION_DAYS` - Number of days to retain metrics (default: 7)
+
+### Data Retention
+
+The worker automatically cleans up old metrics using a Cron Trigger:
+
+- **Schedule:** Daily at 2 AM UTC
+- **Default retention:** 7 days
+- **Configurable:** Set `METRICS_RETENTION_DAYS` in wrangler.toml
+
+Example:
+
+```toml
+[vars]
+METRICS_RETENTION_DAYS = "30"  # Keep metrics for 30 days
+```
+
+Manual cleanup:
+
+```bash
+# Delete metrics older than 7 days
+npm run db:query "DELETE FROM metrics WHERE timestamp < strftime('%s', 'now', '-7 days')"
+```
+
 ### Wrangler.toml
 
 ```toml

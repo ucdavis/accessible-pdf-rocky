@@ -10,6 +10,13 @@ import httpx
 DB_API_URL = os.getenv("DB_API_URL", "http://localhost:8787")
 DB_API_TOKEN = os.getenv("DB_API_TOKEN", "")
 
+# Fail fast if token is missing in production
+if not DB_API_TOKEN and os.getenv("ENVIRONMENT", "development") == "production":
+    raise ValueError(
+        "DB_API_TOKEN must be set in production. "
+        "Set the DB_API_TOKEN environment variable."
+    )
+
 # Timeout configuration
 TIMEOUT = httpx.Timeout(30.0, connect=5.0)
 
@@ -30,6 +37,23 @@ class DatabaseClient:
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         }
+        self._client: Optional[httpx.AsyncClient] = None
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Get or create HTTP client for connection pooling.
+
+        Returns:
+            Async HTTP client
+        """
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=TIMEOUT, headers=self.headers)
+        return self._client
+
+    async def close(self) -> None:
+        """Close the HTTP client and clean up connections."""
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
 
     async def _request(
         self,
@@ -52,17 +76,15 @@ class DatabaseClient:
         Raises:
             httpx.HTTPStatusError: If request fails
         """
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            url = f"{self.base_url}{path}"
-            response = await client.request(
-                method, url, headers=self.headers, json=json, params=params
-            )
-            response.raise_for_status()
+        client = await self._get_client()
+        url = f"{self.base_url}{path}"
+        response = await client.request(method, url, json=json, params=params)
+        response.raise_for_status()
 
-            if response.status_code == 204:  # No content
-                return {}
+        if response.status_code == 204:  # No content
+            return {}
 
-            return response.json()
+        return response.json()
 
     # Job operations
     async def create_job(
@@ -282,3 +304,11 @@ def get_db_client() -> DatabaseClient:
     if _db_client is None:
         _db_client = DatabaseClient()
     return _db_client
+
+
+async def close_db_client() -> None:
+    """Close database client and clean up connections."""
+    global _db_client
+    if _db_client is not None:
+        await _db_client.close()
+        _db_client = None

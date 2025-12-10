@@ -120,11 +120,16 @@ npm run dev  # Start on port 8787 with local D1
 Create `controller/.env`:
 
 ```bash
+ENVIRONMENT=development
 DB_API_URL=http://localhost:8787
 DB_API_TOKEN=dev-token
 STORAGE_MODE=local
 STORAGE_PATH=./storage
 QUEUE_MODE=direct
+
+# Optional: Metrics collection
+METRICS_ENDPOINT=http://localhost:8787/ingest
+METRICS_TOKEN=dev-token
 ```
 
 **Modes:**
@@ -133,6 +138,12 @@ QUEUE_MODE=direct
 - `STORAGE_MODE=r2` - Use actual R2 (requires credentials)
 - `QUEUE_MODE=direct` - Process jobs immediately
 - `QUEUE_MODE=cloudflare` - Use Cloudflare Queues (requires credentials)
+
+**Metrics (Optional):**
+
+- `METRICS_ENDPOINT` - URL for push-based metrics collection (see [Metrics Deployment](METRICS_DEPLOYMENT.md))
+- `METRICS_TOKEN` - Authentication token for metrics endpoint
+- If not configured, metrics collection is silently disabled
 
 ### Frontend (.env.local)
 

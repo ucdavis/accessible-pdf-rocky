@@ -26,31 +26,37 @@ if [ -z "$SCRIPT" ]; then
 	exit 1
 fi
 
+# Canonicalize path to prevent traversal
+SCRIPT_REAL=$(realpath -m "$SCRIPT" 2>/dev/null) || {
+	echo "ERROR: Invalid path: $SCRIPT" >&2
+	exit 1
+}
+
 # Validate script is in allowed directory
 # CRITICAL: Only scripts in /home/slurm_submit/jobs/ can be submitted
-case "$SCRIPT" in
+case "$SCRIPT_REAL" in
 /home/slurm_submit/jobs/*.sh)
 	# Valid path
 	;;
 *)
-	echo "ERROR: Script not in allowed directory: $SCRIPT" >&2
+	echo "ERROR: Script not in allowed directory: $SCRIPT_REAL" >&2
 	echo "ERROR: Only /home/slurm_submit/jobs/*.sh allowed" >&2
 	exit 1
 	;;
 esac
 
 # Validate script exists
-if [ ! -f "$SCRIPT" ]; then
-	echo "ERROR: Script does not exist: $SCRIPT" >&2
+if [ ! -f "$SCRIPT_REAL" ]; then
+	echo "ERROR: Script does not exist: $SCRIPT_REAL" >&2
 	exit 1
 fi
 
 # Validate script is readable
-if [ ! -r "$SCRIPT" ]; then
-	echo "ERROR: Script is not readable: $SCRIPT" >&2
+if [ ! -r "$SCRIPT_REAL" ]; then
+	echo "ERROR: Script is not readable: $SCRIPT_REAL" >&2
 	exit 1
 fi
 
 # Execute sbatch with the validated script
 # No additional arguments are allowed (prevents injection)
-exec /usr/bin/sbatch "$SCRIPT"
+exec /usr/bin/sbatch "$SCRIPT_REAL"

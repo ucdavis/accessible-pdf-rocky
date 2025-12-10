@@ -9,7 +9,13 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+
+def to_camel(string: str) -> str:
+    """Convert snake_case to camelCase."""
+    components = string.split("_")
+    return components[0] + "".join(x.title() for x in components[1:])
 
 
 def utc_now() -> datetime:
@@ -29,6 +35,8 @@ class JobStatus(str, Enum):
 class Job(BaseModel):
     """Job model for tracking PDF processing."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     id: UUID = Field(default_factory=uuid4)
     slurm_id: Optional[str] = None
     status: JobStatus = JobStatus.SUBMITTED
@@ -37,10 +45,13 @@ class Job(BaseModel):
     updated_at: datetime = Field(default_factory=utc_now)
     results_url: Optional[str] = None
     user_id: Optional[UUID] = None
+    error: Optional[str] = None
 
 
 class User(BaseModel):
     """User model for authentication and tracking."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     id: UUID = Field(default_factory=uuid4)
     email: str
@@ -50,8 +61,10 @@ class User(BaseModel):
     is_active: bool = True
 
 
-class ProcessingMetrics(BaseModel):
-    """Processing metrics for monitoring and analytics."""
+class ProcessingMetric(BaseModel):
+    """Processing metric for monitoring and analytics."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     id: UUID = Field(default_factory=uuid4)
     job_id: UUID

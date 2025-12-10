@@ -6,6 +6,8 @@ least privilege - even if FastAPI is compromised, attackers cannot
 run arbitrary commands on the HPC system.
 """
 
+import os
+import shlex
 import subprocess
 import time
 from pathlib import Path
@@ -13,11 +15,25 @@ from pathlib import Path
 # TODO: Import metrics when ready
 # from metrics import submitted_jobs, submission_failures, submission_latency
 
-# Configuration (should come from environment variables in production)
-SLURM_HOST = "hpc-login.ucdavis.edu"  # TODO: Set from env
-SLURM_USER = "slurm_submit"  # Restricted user
-SLURM_KEY_PATH = "/path/to/id_ed25519_slurm_submit"  # TODO: Set from env
-REMOTE_SCRIPT_DIR = "/home/slurm_submit/jobs"  # Validated by wrapper
+# Configuration from environment variables
+SLURM_HOST = os.environ.get("SLURM_HOST", "")
+SLURM_USER = os.environ.get("SLURM_USER", "slurm_submit")
+SLURM_KEY_PATH = os.environ.get("SLURM_KEY_PATH", "")
+REMOTE_SCRIPT_DIR = os.environ.get("REMOTE_SCRIPT_DIR", "/home/slurm_submit/jobs")
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
+
+# Validate required configuration in production
+if ENVIRONMENT == "production":
+    if not SLURM_HOST:
+        raise RuntimeError(
+            "SLURM_HOST must be set in production environment. "
+            "Set the SLURM_HOST environment variable."
+        )
+    if not SLURM_KEY_PATH:
+        raise RuntimeError(
+            "SLURM_KEY_PATH must be set in production environment. "
+            "Set the SLURM_KEY_PATH environment variable."
+        )
 
 
 def submit_slurm_job(job_id: str, input_url: str, output_url: str) -> str:
@@ -40,7 +56,8 @@ def submit_slurm_job(job_id: str, input_url: str, output_url: str) -> str:
     Raises:
         subprocess.CalledProcessError: If SSH or sbatch fails
     """
-    start_time = time.time()
+    start_time = time.time()  # noqa: F841 - Used in commented metrics code
+    local_script = None
 
     try:
         # 1. Create job script locally
@@ -67,7 +84,7 @@ def submit_slurm_job(job_id: str, input_url: str, output_url: str) -> str:
         raise RuntimeError(f"Unexpected error during submission: {e}") from e
     finally:
         # Clean up local script
-        if "local_script" in locals():
+        if local_script is not None:
             Path(local_script).unlink(missing_ok=True)
 
 
@@ -75,22 +92,24 @@ def _create_job_script(job_id: str, input_url: str, output_url: str) -> str:
     """
     Create a temporary job script with embedded URLs.
 
+    Security: Uses shlex.quote() to prevent shell injection.
+
     Returns:
         Path to local temporary script
     """
     # Create temporary script with environment variables set
-    # In production, this would be more sophisticated
+    # Use shlex.quote() to prevent shell injection via URLs
     script_content = f"""#!/bin/bash
-#SBATCH --job-name=wcag-{job_id}
+#SBATCH --job-name=wcag-{shlex.quote(job_id)}
 #SBATCH --gres=gpu:1
 #SBATCH --partition=gpu
 #SBATCH --time=02:00:00
 #SBATCH --output=slurm-%j.out
 #SBATCH --error=slurm-%j.err
 
-export JOB_ID="{job_id}"
-export INPUT_URL="{input_url}"
-export OUTPUT_URL="{output_url}"
+export JOB_ID={shlex.quote(job_id)}
+export INPUT_URL={shlex.quote(input_url)}
+export OUTPUT_URL={shlex.quote(output_url)}
 
 # Source the main job script
 source {REMOTE_SCRIPT_DIR}/job_template.sh
@@ -105,17 +124,34 @@ source {REMOTE_SCRIPT_DIR}/job_template.sh
 
 def _upload_script(local_script: str, job_id: str) -> str:
     """
-    Upload job script to HPC via SFTP.
+    Upload job script to HPC via SCP.
+
+    Security: Uses the same restricted SSH key as job submission.
+
+    Args:
+        local_script: Path to local script file
+        job_id: Job identifier for naming remote file
 
     Returns:
         Remote script path
+
+    Raises:
+        subprocess.CalledProcessError: If SCP upload fails
     """
     remote_path = f"{REMOTE_SCRIPT_DIR}/job_{job_id}.sh"
+    remote_target = f"{SLURM_USER}@{SLURM_HOST}:{remote_path}"
 
-    # TODO: Implement actual SFTP upload
-    # Using paramiko or subprocess with sftp
-    # Example:
-    # sftp -i {SLURM_KEY_PATH} {SLURM_USER}@{SLURM_HOST} <<< "put {local_script} {remote_path}"
+    cmd = [
+        "scp",
+        "-i",
+        SLURM_KEY_PATH,
+        "-o",
+        "StrictHostKeyChecking=yes",
+        local_script,
+        remote_target,
+    ]
+
+    subprocess.run(cmd, capture_output=True, text=True, check=True)
 
     return remote_path
 

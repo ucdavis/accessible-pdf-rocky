@@ -562,7 +562,8 @@ export default {
   - Cloudflare Queues
   - R2 storage
   - D1 database API (via token)
-  - SLURM submission
+  - SLURM submission (SSH key and host)
+  - Metrics endpoint (optional, see [Metrics Deployment](METRICS_DEPLOYMENT.md))
 
 ### HPC Runner
 
@@ -590,9 +591,16 @@ export default {
 ## Monitoring
 
 - **Cloudflare**: Analytics dashboard
-- **FastAPI**: [Prometheus](https://prometheus.io/) metrics
+- **FastAPI**: Push-based metrics to Cloudflare Worker (see [Metrics Deployment](METRICS_DEPLOYMENT.md))
+- **HPC**: SLURM metrics export script (see [Monitoring Setup](MONITORING_SETUP.md))
+- **Prometheus/Grafana**: Pull metrics from Cloudflare Worker endpoint
 - **SLURM**: `sacct`, `squeue` for job monitoring
 - **R2**: Storage metrics via Cloudflare dashboard
 - **Database**: D1 metrics via Cloudflare dashboard
+
+For detailed setup instructions, see:
+
+- [Monitoring Setup](MONITORING_SETUP.md) - Prometheus and Grafana configuration
+- [Metrics Deployment](METRICS_DEPLOYMENT.md) - Cloudflare Worker metrics infrastructure
 
 This architecture is production-ready, horizontally scalable, HPC-integrated, and Cloudflare-native.

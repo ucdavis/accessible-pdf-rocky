@@ -8,6 +8,20 @@
 export interface Env {
 	METRICS_DB: D1Database;
 	METRICS_AUTH_TOKEN: string;
+	METRICS_RETENTION_DAYS?: string; // Optional, defaults to 7
+}
+
+/**
+ * Timing-safe string comparison to prevent timing attacks.
+ * Compares two strings in constant time regardless of where they differ.
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+	if (a.length !== b.length) return false;
+	let result = 0;
+	for (let i = 0; i < a.length; i++) {
+		result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+	}
+	return result === 0;
 }
 
 interface MetricPayload {
@@ -29,6 +43,8 @@ export default {
 		const url = new URL(request.url);
 
 		// CORS headers for browser access
+		// Note: Using '*' for Access-Control-Allow-Origin. In production, consider
+		// restricting to specific trusted origins via environment variable.
 		const corsHeaders = {
 			'Access-Control-Allow-Origin': '*',
 			'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -60,25 +76,59 @@ export default {
 				return await handleApiSources(env, corsHeaders);
 			}
 
-			return new Response('Not Found', { status: 404, headers: corsHeaders });
+		return new Response('Not Found', { status: 404, headers: corsHeaders });
 		} catch (error) {
 			console.error('Error handling request:', error);
-			return new Response(`Internal Server Error: ${error.message}`, {
+			const message = error instanceof Error ? error.message : 'Unknown error';
+			return new Response(`Internal Server Error: ${message}`, {
 				status: 500,
 				headers: corsHeaders,
 			});
 		}
 	},
+
+	async scheduled(event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
+		// Automated data retention - delete old metrics
+		const retentionDays = parseInt(env.METRICS_RETENTION_DAYS || '7', 10);
+		const cutoffTimestamp = Math.floor(Date.now() / 1000) - retentionDays * 86400;
+
+		console.log(
+			`Cleaning up metrics older than ${retentionDays} days (timestamp < ${cutoffTimestamp})`
+		);
+
+		try {
+			const result = await env.METRICS_DB.prepare(
+				'DELETE FROM metrics WHERE timestamp < ?'
+			).bind(cutoffTimestamp).run();
+
+			console.log(
+				`Data retention cleanup completed. Rows deleted: ${result.meta.changes || 0}`
+			);
+		} catch (error) {
+			console.error('Failed to clean up old metrics:', error);
+			// Don't throw - let the cron trigger retry
+		}
+	},
 };
 
 async function handleIngest(request: Request, env: Env, corsHeaders: Record<string, string>): Promise<Response> {
-	// Authenticate
+	// Authenticate (using timing-safe comparison)
 	const authHeader = request.headers.get('Authorization');
-	if (!authHeader || authHeader !== `Bearer ${env.METRICS_AUTH_TOKEN}`) {
+	const expectedToken = `Bearer ${env.METRICS_AUTH_TOKEN}`;
+	if (!authHeader || !timingSafeEqual(authHeader, expectedToken)) {
 		return new Response('Unauthorized', { status: 401, headers: corsHeaders });
 	}
 
-	const payload: MetricPayload = await request.json();
+	// Parse JSON with error handling
+	let payload: MetricPayload;
+	try {
+		payload = await request.json();
+	} catch {
+		return new Response('Invalid JSON payload', {
+			status: 400,
+			headers: corsHeaders,
+		});
+	}
 
 	// Validate payload
 	if (!payload.source || !payload.timestamp || !payload.metrics) {
@@ -159,7 +209,8 @@ async function handlePrometheusMetrics(env: Env): Promise<Response> {
 
 	for (const [metricName, rows] of groupedMetrics) {
 		// Add HELP and TYPE comments (assume all are gauges for simplicity)
-		output += `# HELP ${metricName} Metric from ${rows[0].source}\n`;
+		const sources = [...new Set(rows.map((r) => r.source))].join(', ');
+		output += `# HELP ${metricName} Metric from ${sources}\n`;
 		output += `# TYPE ${metricName} gauge\n`;
 
 		for (const row of rows) {

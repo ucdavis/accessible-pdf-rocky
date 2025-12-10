@@ -1,4 +1,6 @@
 -- Metrics table
+-- Data retention: Automated cleanup runs daily via Cron Trigger (see wrangler.toml)
+-- Default retention: 7 days (configurable in src/index.ts)
 CREATE TABLE IF NOT EXISTS metrics (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   source TEXT NOT NULL,

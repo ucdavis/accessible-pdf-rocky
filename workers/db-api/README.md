@@ -126,7 +126,19 @@ See `schema.sql` for the complete database schema. Tables:
 
 ## Security
 
-- All endpoints require Bearer token authentication
-- Token is stored as a Cloudflare Workers secret
-- CORS enabled for all origins (can be restricted if needed)
-- D1 database is not directly accessible from the internet
+- **Authentication**: All endpoints require Bearer token authentication
+- **Token Storage**: Token is stored as a Cloudflare Workers secret
+- **CORS**: Configurable via `ALLOWED_ORIGIN` environment variable (defaults to `*` for development)
+  - Set `ALLOWED_ORIGIN` in production to restrict to your controller's domain
+  - Example: `ALLOWED_ORIGIN = "https://controller.example.com"`
+- **Referential Integrity**: Foreign key validation ensures metrics reference existing jobs
+- **Database Security**: D1 database is not directly accessible from the internet
+
+### Production Security Configuration
+
+In `wrangler.toml`:
+
+```toml
+[vars]
+ALLOWED_ORIGIN = "https://your-controller-domain.com"
+```

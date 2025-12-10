@@ -52,15 +52,6 @@ def test_get_status_not_found():
             assert response.json()["detail"] == "Job not found"
 
 
-def test_job_status_response_model():
-    """Test JobStatusResponse model validation."""
-    from main import JobStatusResponse
-
-    status = JobStatusResponse(job_id="test-123", status="completed")
-    assert status.job_id == "test-123"
-    assert status.status == "completed"
-
-
 def test_job_status_enum():
     """Test JobStatus enum values."""
     assert JobStatus.SUBMITTED.value == "submitted"

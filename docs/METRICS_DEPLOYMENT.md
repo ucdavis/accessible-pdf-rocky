@@ -194,8 +194,11 @@ echo $?  # Should print 0
 crontab -e
 
 # Add this line (runs every minute):
-* * * * * export METRICS_TOKEN='your-token' && /usr/local/bin/export_slurm_metrics.sh >> /var/log/slurm_metrics.log 2>&1
+# Sources token from secure file instead of exposing in crontab
+* * * * * . ~/.metrics_token && /usr/local/bin/export_slurm_metrics.sh >> /var/log/slurm_metrics.log 2>&1
 ```
+
+**Security Note:** This sources the token from `~/.metrics_token` (created in step 2.1) instead of embedding it in the crontab, which would expose it via `ps` or process listings.
 
 **Note:** Check with your HPC admin for proper log directory permissions.
 

@@ -30,11 +30,11 @@ class TestDBModels:
 
         assert User is not None
 
-    def test_processing_metrics_model_exists(self):
-        """Test that ProcessingMetrics model class exists."""
-        from db.models import ProcessingMetrics
+    def test_processing_metric_model_exists(self):
+        """Test that ProcessingMetric model class exists."""
+        from db.models import ProcessingMetric
 
-        assert ProcessingMetrics is not None
+        assert ProcessingMetric is not None
 
     def test_utc_now_returns_timezone_aware_datetime(self):
         """Test that utc_now() returns timezone-aware datetime in UTC."""
@@ -89,17 +89,17 @@ class TestDBModels:
         # Timestamp should be timezone-aware
         assert user.created_at.tzinfo is not None
 
-    def test_processing_metrics_model_fields_and_defaults(self):
-        """Test ProcessingMetrics model field definitions and default values."""
+    def test_processing_metric_model_fields_and_defaults(self):
+        """Test ProcessingMetric model field definitions and default values."""
         from uuid import UUID
-        from db.models import ProcessingMetrics
+        from db.models import ProcessingMetric
 
         # Need a job_id UUID for the foreign key
         from uuid import uuid4
 
         job_id = uuid4()
 
-        metrics = ProcessingMetrics(job_id=job_id)
+        metrics = ProcessingMetric(job_id=job_id)
 
         # Check types and defaults
         assert isinstance(metrics.id, UUID)
