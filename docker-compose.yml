@@ -3,15 +3,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: accessible_pdf
-      POSTGRES_USER: dev
-      POSTGRES_PASSWORD: devpass
+      POSTGRES_DB: ${POSTGRES_DB:-accessible_pdf}
+      POSTGRES_USER: ${POSTGRES_USER:-dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpass}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dev -d accessible_pdf"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dev} -d ${POSTGRES_DB:-accessible_pdf}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -24,10 +24,12 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://dev:devpass@postgres:5432/accessible_pdf
-      STORAGE_MODE: local  # local filesystem instead of R2
-      STORAGE_PATH: /app/storage
-      QUEUE_MODE: direct  # skip queue, process directly
+      DATABASE_URL: >-
+        postgresql+asyncpg://${POSTGRES_USER:-dev}:${POSTGRES_PASSWORD:-devpass}
+        @postgres:5432/${POSTGRES_DB:-accessible_pdf}
+      STORAGE_MODE: ${STORAGE_MODE:-local}
+      STORAGE_PATH: ${STORAGE_PATH:-/app/storage}
+      QUEUE_MODE: ${QUEUE_MODE:-direct}
     volumes:
       - ./controller:/app
       - storage_data:/app/storage
@@ -44,7 +46,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     volumes:
       - ./frontend:/app
       - /app/node_modules

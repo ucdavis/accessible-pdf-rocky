@@ -45,6 +45,20 @@ class TestDBModels:
         assert hasattr(ProcessingMetrics, "__tablename__")
         assert ProcessingMetrics.__tablename__ == "processing_metrics"
 
+    def test_utc_now_returns_timezone_aware_datetime(self):
+        """Test that utc_now() returns timezone-aware datetime in UTC."""
+        from datetime import timezone
+        from db.models import utc_now
+
+        result = utc_now()
+
+        # Should return a datetime object
+        assert result is not None
+        # Should be timezone-aware (not naive)
+        assert result.tzinfo is not None
+        # Should be in UTC timezone
+        assert result.tzinfo == timezone.utc
+
 
 class TestDBSession:
     """Tests for db/session.py"""
@@ -64,11 +78,13 @@ class TestDBSession:
         assert inspect.isasyncgenfunction(get_session)
 
     def test_engine_created(self):
-        """Test that database engine is created."""
+        """Test that database engine is created with async driver."""
         from db.session import engine
 
         assert engine is not None
         assert hasattr(engine, "url")
+        # Verify using async driver (postgresql+asyncpg://)
+        assert engine.url.drivername == "postgresql+asyncpg"
 
     def test_async_session_factory_created(self):
         """Test that async session factory is created."""

@@ -22,7 +22,8 @@ def client():
     with patch("db.session.init_db", new_callable=AsyncMock):
         from main import app
 
-        return TestClient(app)
+        with TestClient(app) as test_client:
+            yield test_client
 
 
 def test_read_root(client):
@@ -33,14 +34,13 @@ def test_read_root(client):
 
 def test_get_status_not_found():
     """Test job status endpoint returns 404 for non-existent job."""
-    from unittest.mock import AsyncMock, MagicMock, patch
+    from unittest.mock import AsyncMock, patch
     from fastapi.testclient import TestClient
 
     # Mock the database session
     mock_session = AsyncMock()
-    mock_result = MagicMock()
-    mock_result.scalar_one_or_none.return_value = None
-    mock_session.execute.return_value = mock_result
+    # Mock session.get() to return None (job not found)
+    mock_session.get.return_value = None
 
     # Override the get_session dependency
     async def mock_get_session():
@@ -61,7 +61,6 @@ def test_get_status_not_found():
                 assert response.json()["detail"] == "Job not found"
         finally:
             app.dependency_overrides.clear()
-        app.dependency_overrides.clear()
 
 
 def test_job_status_response_model():

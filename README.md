@@ -36,6 +36,9 @@ Designed for UC Davis document remediation needs.
 ## Quick Start
 
 ```bash
+# Copy environment template
+cp .env.example .env
+
 # Setup all development environments
 just setup
 
