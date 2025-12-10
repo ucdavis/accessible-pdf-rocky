@@ -13,13 +13,13 @@ Production-grade accessible PDF system with Cloudflare Workers, FastAPI, and HPC
 
 ## Why Use This?
 
-This project aims to automate PDF accessibility remediation using modern AI models. The goal is to:
+This project aims to automate PDF accessibility remediation using modern AI models.
 
-- **Modern AI**: Uses LayoutLMv3, BLIP-2, and other state-of-the-art models for document understanding and alt-text generation
 - **Batch Processing**: Enable processing of large document collections without manual review
 - **Cost Efficient**: Leverage existing HPC infrastructure for cost-effective processing
 - **Deployment Flexibility**: Cloud, hybrid, or fully on-premise with HPC integration
-- **WCAG 2.1 AA Compliance**: Automated enforcement, not just checking
+- **Modern AI**: Uses LayoutLMv3, BLIP-2, and other state-of-the-art models for document understanding and alt-text generation
+- **WCAG 2.1 AA Compliance**: Automated enforcement, not just checking. Easily upgrade compliance standards.
 
 Designed for UC Davis document remediation needs.
 
@@ -27,10 +27,10 @@ Designed for UC Davis document remediation needs.
 
 ## Repository Structure
 
-- `frontend/` – Next.js UI (Cloudflare Pages)
-- `workers/` – Cloudflare Workers (R2 + Queues)
 - `controller/` – FastAPI bridge to HPC cluster
+- `frontend/` – Next.js UI (Cloudflare Pages)
 - `hpc_runner/` – SLURM job runner (heavy ML + PDF)
+- `workers/` – Cloudflare Workers (R2 + Queues)
 
 ## Quick Start
 
@@ -38,11 +38,17 @@ Designed for UC Davis document remediation needs.
 # Setup all development environments
 just setup
 
-# Run linting
-just lint
+# Run CI checks (linting + tests)
+just ci
 
 # Start all services with Docker
 just dev
+
+# Before committing (includes coverage)
+just commit-check
+
+# See all available commands
+just help
 ```
 
 ## Documentation

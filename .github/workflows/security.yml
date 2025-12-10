@@ -49,9 +49,9 @@ jobs:
         working-directory: ./${{ matrix.directory }}
         run: uv sync
       
-      - name: Run safety check
+      - name: Run pip-audit
         working-directory: ./${{ matrix.directory }}
         run: |
-          uv pip install safety
-          uv run safety check --json
+          uv pip install pip-audit
+          uv run pip-audit
         continue-on-error: true
