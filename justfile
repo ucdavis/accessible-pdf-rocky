@@ -322,6 +322,10 @@ spell-check: _ensure-npm
     # Use -z for NUL-delimited output to handle filenames with spaces
     while IFS= read -r -d '' status_line; do
         # Extract filename from git status --porcelain -z format
+        # Skip deleted files (D in first two characters)
+        if [[ "$status_line" =~ ^[^D]D[[:space:]](.*)$ ]] || [[ "$status_line" =~ ^D[^D][[:space:]](.*)$ ]]; then
+            continue
+        fi
         if [[ "$status_line" =~ ^..[[:space:]](.*)$ ]]; then
             filename="${BASH_REMATCH[1]}"
             # For renames (format: "old -> new"), take the new filename
