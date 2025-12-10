@@ -24,9 +24,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: >-
-        postgresql+asyncpg://${POSTGRES_USER:-dev}:${POSTGRES_PASSWORD:-devpass}
-        @postgres:5432/${POSTGRES_DB:-accessible_pdf}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       STORAGE_MODE: ${STORAGE_MODE:-local}
       STORAGE_PATH: ${STORAGE_PATH:-/app/storage}
       QUEUE_MODE: ${QUEUE_MODE:-direct}

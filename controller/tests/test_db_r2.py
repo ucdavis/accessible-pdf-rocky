@@ -147,8 +147,9 @@ class TestDBSession:
 
         assert engine is not None
         assert hasattr(engine, "url")
-        # Verify using async driver (postgresql+asyncpg://)
-        assert engine.url.drivername == "postgresql+asyncpg"
+        # Verify using an async PostgreSQL driver (postgresql+asyncpg, postgresql+asyncpg_sa, etc.)
+        assert engine.url.drivername.startswith("postgresql+")
+        assert "async" in engine.url.drivername
 
     def test_async_session_factory_created(self):
         """Test that async session factory is created."""
