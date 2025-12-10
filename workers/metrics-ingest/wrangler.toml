@@ -1,0 +1,21 @@
+name = "metrics-ingest"
+main = "src/index.ts"
+compatibility_date = "2024-12-10"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 Database binding
+[[d1_databases]]
+binding = "METRICS_DB"
+database_name = "metrics-db"
+database_id = "" # Will be filled after running: wrangler d1 create metrics-db
+
+# Secrets (set with: wrangler secret put METRICS_AUTH_TOKEN)
+# METRICS_AUTH_TOKEN = ""
+
+# Routes (customize based on your domain)
+# routes = [
+#   { pattern = "metrics.your-domain.com/*", zone_name = "your-domain.com" }
+# ]
+
+[observability]
+enabled = true

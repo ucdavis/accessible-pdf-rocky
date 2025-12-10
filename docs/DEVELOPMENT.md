@@ -30,10 +30,11 @@ flowchart LR
     A[User] --> B[Next.js<br/>localhost:3000]
     B --> C[FastAPI<br/>localhost:8000]
     C --> D[Local FS]
-    C --> E[Postgres<br/>localhost:5432]
+    C --> E[D1 API Worker<br/>localhost:8787]
     
     style B fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
     style C fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
+    style E fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
 ```
 
 **Key differences:**
@@ -55,9 +56,10 @@ just dev
 
 This starts:
 
-- PostgreSQL on port 5432
 - FastAPI controller on port 8000
 - Next.js frontend on port 3000
+
+**Note:** The D1 API worker is not included in docker-compose. You need to run it separately with `wrangler dev` (see Terminal 3 setup below). This is intentional - Wrangler's local dev server provides D1 emulation without Docker.
 
 **Detached mode:**
 
@@ -100,11 +102,16 @@ just dev-controller
 cd controller && uv run uvicorn main:app --reload
 ```
 
-Terminal 3 - Postgres (via Docker):
+Terminal 3 - D1 API Worker:
 
 ```bash
-docker run -p 5432:5432 -e POSTGRES_PASSWORD=devpass postgres:16-alpine
+cd workers/db-api
+npm install
+npm run db:migrate:local  # Apply schema to local D1
+npm run dev  # Start on port 8787 with local D1
 ```
+
+**Note:** `wrangler dev` includes a local D1 SQLite instance automatically - no Docker needed! The local database is stored in `.wrangler/state/` and persists between runs.
 
 ## Environment Configuration
 
@@ -113,7 +120,8 @@ docker run -p 5432:5432 -e POSTGRES_PASSWORD=devpass postgres:16-alpine
 Create `controller/.env`:
 
 ```bash
-DATABASE_URL=postgresql://dev:devpass@localhost:5432/accessible_pdf
+DB_API_URL=http://localhost:8787
+DB_API_TOKEN=dev-token
 STORAGE_MODE=local
 STORAGE_PATH=./storage
 QUEUE_MODE=direct
@@ -271,14 +279,15 @@ ports:
 ### Database Connection Errors
 
 ```bash
-# Check if Postgres is running
-docker compose ps
+# Check if D1 API Worker is running
+cd workers/db-api
+npm run dev
 
-# View Postgres logs
-docker compose logs postgres
+# Test API connection
+curl http://localhost:8787/jobs \
+  -H "Authorization: Bearer dev-token"
 
-# Restart Postgres
-just dev-restart postgres
+# Check Worker logs in terminal
 ```
 
 ### Import Errors in Python

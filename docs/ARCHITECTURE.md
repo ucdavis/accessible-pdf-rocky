@@ -32,7 +32,7 @@ Runs on a publicly accessible host:
 - Generate presigned R2 URLs for SLURM jobs
 - Create [SLURM](https://slurm.schedmd.com/) job submissions
 - Track job status
-- Update [Postgres](https://www.postgresql.org/)
+- Update [D1 database](https://developers.cloudflare.com/d1/) via API Worker
 - Expose API to frontend
 
 The FastAPI service bridges Cloudflare and the HPC cluster.
@@ -66,6 +66,9 @@ flowchart TD
     Queue["Cloudflare Queue<br/>(job messages)"] -->|dequeues| Controller
     
     Controller["FastAPI Controller<br/>• Pull Queue Jobs<br/>• Generate R2 URLs<br/>• Submit SLURM Jobs<br/>• Monitor sacct/squeue"] --> HPC
+    Controller -->|HTTP API| DBWorker
+    
+    DBWorker["D1 API Worker<br/>• Job tracking<br/>• User management<br/>• Processing metrics"]
     
     HPC["HPC Cluster SLURM<br/>GPU Nodes run heavy ML<br/>• Layout detection<br/>• Alt-text models<br/>• WCAG enforcement<br/>• PDF tagging"] <-->|download/upload| R2
     
@@ -75,6 +78,7 @@ flowchart TD
     style Workers fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
     style Queue fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
     style Controller fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
+    style DBWorker fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
     style HPC fill:#ff9999,stroke:#cc0000,stroke-width:3px,color:#000
     style R2 fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
 ```
@@ -557,7 +561,7 @@ export default {
 - Needs credentials for:
   - Cloudflare Queues
   - R2 storage
-  - Postgres database
+  - D1 database API (via token)
   - SLURM submission
 
 ### HPC Runner
@@ -580,7 +584,7 @@ export default {
 - **API Authentication**: Cloudflare Access or API tokens
 - **HPC Access**: SSH keys, no passwords
 - **R2 Credentials**: Presigned URLs (time-limited, single-use)
-- **Database**: Connection pooling, encrypted at rest
+- **Database**: D1 API with Bearer token authentication
 - **PDFs**: Presigned URLs for temporary access (1 hour expiry)
 
 ## Monitoring
@@ -589,6 +593,6 @@ export default {
 - **FastAPI**: [Prometheus](https://prometheus.io/) metrics
 - **SLURM**: `sacct`, `squeue` for job monitoring
 - **R2**: Storage metrics via Cloudflare dashboard
-- **Database**: Query performance monitoring
+- **Database**: D1 metrics via Cloudflare dashboard
 
 This architecture is production-ready, horizontally scalable, HPC-integrated, and Cloudflare-native.

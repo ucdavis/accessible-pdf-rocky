@@ -30,7 +30,7 @@ All MVP work is tracked in GitHub Issues with the `MVP v0.1` milestone:
 - **Issue #1**: Frontend PDF upload UI
 - **Issue #2**: Cloudflare R2 storage integration
 - **Issue #3**: Cloudflare Queue for job submission
-- **Issue #4**: Database setup (Postgres)
+- **Issue #4**: Database setup (D1 API Worker)
 - **Issue #5**: FastAPI controller queue listener
 - **Issue #6**: SLURM job submission from controller
 - **Issue #7**: Basic PDF analysis (mock implementation)
@@ -46,7 +46,7 @@ View milestone: <https://github.com/ucdavis/accessible-pdf-rocky/milestone/1>
 
 1. Set up R2 bucket
 2. Configure Cloudflare Queue
-3. Deploy Postgres database
+3. Deploy D1 database and API Worker
 
 ### Phase 2: Backend Foundation (Issues #5, #6, #8)
 
