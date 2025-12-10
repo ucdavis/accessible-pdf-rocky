@@ -27,7 +27,7 @@ def test_get_status(client):
     """Test job status endpoint."""
     response = client.get("/status/test-job-123")
     assert response.status_code == 200
-    
+
     data = response.json()
     assert data["job_id"] == "test-job-123"
     assert data["status"] == "queued"

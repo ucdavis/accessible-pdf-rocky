@@ -1,12 +1,11 @@
 """Tests for HPC SLURM submission."""
 
-import pytest
 from pathlib import Path
 
 
 def test_submit_placeholder():
     """Placeholder test for SLURM submission.
-    
+
     TODO: Implement once hpc/submit.py has actual implementation.
     """
     # For now, just verify the script exists

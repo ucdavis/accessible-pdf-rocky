@@ -14,7 +14,7 @@ from runner import analyze_pdf, main
 def test_analyze_pdf():
     """Test PDF analysis function."""
     result = analyze_pdf("/fake/path.pdf", "job-123")
-    
+
     assert result["job_id"] == "job-123"
     assert result["pdf_path"] == "/fake/path.pdf"
     assert result["status"] == "completed"
@@ -33,16 +33,15 @@ def test_main_missing_pdf(monkeypatch, capsys):
     """Test main function with missing PDF file."""
     # Mock sys.argv
     monkeypatch.setattr(
-        "sys.argv",
-        ["runner.py", "/nonexistent/file.pdf", "--job-id", "test-123"]
+        "sys.argv", ["runner.py", "/nonexistent/file.pdf", "--job-id", "test-123"]
     )
-    
+
     # Should exit with code 1
     with pytest.raises(SystemExit) as exc_info:
         main()
-    
+
     assert exc_info.value.code == 1
-    
+
     captured = capsys.readouterr()
     assert "Error: PDF file not found" in captured.err
 
@@ -52,10 +51,10 @@ def test_main_with_output_file(monkeypatch, tmp_path):
     # Create a temporary PDF file
     pdf_file = tmp_path / "test.pdf"
     pdf_file.write_text("fake pdf content")
-    
+
     # Create output path
     output_file = tmp_path / "output.json"
-    
+
     # Mock sys.argv
     monkeypatch.setattr(
         "sys.argv",
@@ -66,18 +65,18 @@ def test_main_with_output_file(monkeypatch, tmp_path):
             "test-123",
             "--output",
             str(output_file),
-        ]
+        ],
     )
-    
+
     # Run main
     exit_code = main()
-    
+
     assert exit_code == 0
     assert output_file.exists()
-    
+
     # Verify output JSON
     with open(output_file) as f:
         data = json.load(f)
-    
+
     assert data["job_id"] == "test-123"
     assert data["pdf_path"] == str(pdf_file)

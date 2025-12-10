@@ -18,7 +18,7 @@ setup:
     echo ""
     
     # Check for required tools
-    for tool in uv node npm; do
+    for tool in uv node npm docker; do
         if command -v "$tool" &> /dev/null; then
             echo "  ✓ $tool installed"
         else
@@ -30,6 +30,11 @@ setup:
                     echo "    Linux/WSL: curl -LsSf https://astral.sh/uv/install.sh | sh"
                     ;;
                 node|npm) echo "    Install: https://nodejs.org" ;;
+                docker)
+                    echo "    Install: https://www.docker.com/get-started"
+                    echo "    macOS: brew install --cask docker"
+                    echo "    Linux: https://docs.docker.com/engine/install/"
+                    ;;
             esac
         fi
     done
@@ -313,6 +318,11 @@ dev-workers: _ensure-npm
 # CI simulation: quality checks with comprehensive testing
 ci: lint test
     @echo "🎯 CI simulation complete!"
+
+# Pre-commit workflow: comprehensive validation before committing
+# Runs: linting + all tests
+commit-check: lint test
+    @echo "🚀 Ready to commit! All checks passed!"
 
 # Type checking
 typecheck: _ensure-npm

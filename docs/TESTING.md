@@ -70,6 +70,7 @@ hpc_runner/
 ```
 
 **Conventions:**
+
 - Test files: `test_*.py`
 - Test functions: `test_*`
 - Use fixtures for setup/teardown
@@ -86,6 +87,7 @@ frontend/
 ```
 
 **Conventions:**
+
 - Test files: `*.test.tsx` or `*.spec.tsx`
 - Use React Testing Library
 - Test user interactions, not implementation
@@ -100,6 +102,7 @@ workers/
 ```
 
 **Conventions:**
+
 - Test files: `*.test.ts` or `*.spec.ts`
 - Use Vitest's built-in mocking
 - Test worker behavior in isolation
@@ -162,6 +165,7 @@ open coverage/index.html
 ## CI/CD Integration
 
 Tests run automatically on:
+
 - Every push to `main`
 - Every pull request
 - Schedule (weekly)
@@ -174,7 +178,7 @@ Tests run automatically on:
 
 ### Workflow Status
 
-View test results: https://github.com/ucdavis/accessible-pdf-rocky/actions
+View test results: <https://github.com/ucdavis/accessible-pdf-rocky/actions>
 
 ## Best Practices
 
@@ -231,21 +235,23 @@ npm test -- -u
 
 ## Test Dependencies
 
-### Python
+### Python Dependencies
 
 - `pytest` - Test framework
 - `pytest-cov` - Coverage plugin
 - `pytest-asyncio` - Async test support (controller only)
 - `httpx` - HTTP client for FastAPI tests
 
-### JavaScript/TypeScript
+### JavaScript/TypeScript Dependencies
 
 #### Frontend
+
 - `jest` - Test framework
 - `@testing-library/react` - React testing utilities
 - `@testing-library/jest-dom` - DOM matchers
 
 #### Workers
+
 - `vitest` - Fast test framework
 - `@vitest/coverage-v8` - Coverage reporter
 
