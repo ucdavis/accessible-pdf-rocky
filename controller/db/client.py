@@ -91,7 +91,8 @@ class DatabaseClient:
         try:
             return response.json()
         except ValueError as e:
-            logger.error(f"Invalid JSON response from {url}: {e}")
+            safe_url = str(url).replace('\r', '').replace('\n', '')
+            logger.error(f"Invalid JSON response from {safe_url}: {e}")
             raise ValueError(f"Invalid JSON response from API: {e}") from e
 
     # Job operations
