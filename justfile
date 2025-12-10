@@ -283,16 +283,6 @@ setup:
     done
     
     echo ""
-    echo "Installing Python linting tools..."
-    # Install yamllint globally via uv
-    if ! uv tool list | grep -q yamllint; then
-        echo "  Installing yamllint..."
-        uv tool install yamllint
-    else
-        echo "  ✓ yamllint already installed"
-    fi
-    
-    echo ""
     echo "Installing Python environments..."
     
     # Controller setup

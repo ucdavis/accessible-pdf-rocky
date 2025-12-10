@@ -7,41 +7,25 @@ import JobStatusBadge from "../JobStatusBadge";
 import UploadForm from "../UploadForm";
 
 describe("JobStatusBadge", () => {
-  test("renders submitted status correctly", () => {
-    render(<JobStatusBadge status="submitted" />);
-    const badge = screen.getByText("submitted");
-    expect(badge).toBeInTheDocument();
-    expect(badge.className).toContain("bg-zinc-200");
-  });
+  const cases = [
+    { status: "submitted", colorClass: "bg-zinc-200" },
+    { status: "running", colorClass: "bg-blue-100" },
+    { status: "completed", colorClass: "bg-green-100" },
+    { status: "failed", colorClass: "bg-red-100" },
+  ] as const;
 
-  test("renders running status with blue styling", () => {
-    render(<JobStatusBadge status="running" />);
-    const badge = screen.getByText("running");
-    expect(badge).toBeInTheDocument();
-    expect(badge.className).toContain("bg-blue-100");
-  });
-
-  test("renders completed status with green styling", () => {
-    render(<JobStatusBadge status="completed" />);
-    const badge = screen.getByText("completed");
-    expect(badge).toBeInTheDocument();
-    expect(badge.className).toContain("bg-green-100");
-  });
-
-  test("renders failed status with red styling", () => {
-    render(<JobStatusBadge status="failed" />);
-    const badge = screen.getByText("failed");
-    expect(badge).toBeInTheDocument();
-    expect(badge.className).toContain("bg-red-100");
-  });
-
-  test("applies common badge styling to all statuses", () => {
-    render(<JobStatusBadge status="submitted" />);
-    const badge = screen.getByText("submitted");
-    expect(badge.className).toContain("rounded-full");
-    expect(badge.className).toContain("px-3");
-    expect(badge.className).toContain("py-1");
-  });
+  test.each(cases)(
+    "renders %s status with correct styling",
+    ({ status, colorClass }) => {
+      render(<JobStatusBadge status={status} />);
+      const badge = screen.getByText(status);
+      expect(badge).toBeInTheDocument();
+      expect(badge.className).toContain(colorClass);
+      expect(badge.className).toContain("rounded-full");
+      expect(badge.className).toContain("px-3");
+      expect(badge.className).toContain("py-1");
+    },
+  );
 });
 
 describe("UploadForm", () => {
