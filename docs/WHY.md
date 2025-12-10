@@ -145,7 +145,6 @@ Adobe solutions are **SaaS-only**. No option to:
 
 - Run on-premise
 - Use HPC cluster resources
-- Deploy in air-gapped environments
 - Customize infrastructure
 
 ### ❌ Custom Model Training
@@ -251,8 +250,6 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for infrastructure details.
 
 - Cloud deployment (Cloudflare + external GPU)
 - Hybrid (edge + on-prem HPC)
-- Fully on-premise (air-gapped environments)
-- Government/DoD secure enclaves
 
 ### 7. Complete Transparency
 

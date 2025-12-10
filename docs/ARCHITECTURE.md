@@ -248,28 +248,37 @@ You'll notice some similar file names in both `controller/services/` and `hpc_ru
 
 #### Complete Flow Example
 
-```
-1. User uploads PDF
-   ↓
-2. Controller/services/pdf_normalizer detects PDF type
-   ↓
-3. Controller/services/ocr_engine decides: "This needs OCR"
-   ↓
-4. Controller submits SLURM job to HPC
-   ↓
-5. HPC runner.py starts:
-   a. hpc_runner/processors/ocr.py runs Tesseract (heavy)
-   b. hpc_runner/ai/layout runs LayoutLMv3 (heavy)
-   c. hpc_runner/processors/wcag validates predictions
-   d. hpc_runner/processors/tagging adds semantic tags
-   ↓
-6. Results return to controller
-   ↓
-7. Controller/services/wcag_engine final validation
-   ↓
-8. Controller/services/pdf_builder assembles output PDF
-   ↓
-9. Upload to R2
+```mermaid
+flowchart TD
+    A["1. User uploads PDF"] --> B["2. Controller/services/pdf_normalizer<br/>detects PDF type"]
+    B --> C["3. Controller/services/ocr_engine<br/>decides: 'This needs OCR'"]
+    C --> D["4. Controller submits<br/>SLURM job to HPC"]
+    
+    D --> E["5. HPC runner.py starts:"]
+    
+    E --> E1["a. hpc_runner/processors/ocr.py<br/>runs Tesseract (heavy)"]
+    E1 --> E2["b. hpc_runner/ai/layout<br/>runs LayoutLMv3 (heavy)"]
+    E2 --> E3["c. hpc_runner/processors/wcag<br/>validates predictions"]
+    E3 --> E4["d. hpc_runner/processors/tagging<br/>adds semantic tags"]
+    
+    E4 --> F["6. Results return<br/>to controller"]
+    F --> G["7. Controller/services/wcag_engine<br/>final validation"]
+    G --> H["8. Controller/services/pdf_builder<br/>assembles output PDF"]
+    H --> I["9. Upload to R2"]
+    
+    style A fill:#e1f5ff
+    style B fill:#d4edda
+    style C fill:#d4edda
+    style D fill:#d4edda
+    style E fill:#f8d7da
+    style E1 fill:#f8d7da
+    style E2 fill:#f8d7da
+    style E3 fill:#f8d7da
+    style E4 fill:#f8d7da
+    style F fill:#d4edda
+    style G fill:#d4edda
+    style H fill:#d4edda
+    style I fill:#e1f5ff
 ```
 
 **Key Insight:** Controller services are lightweight orchestrators. HPC runners are heavy processors. Similar names, different purposes, different stages.
