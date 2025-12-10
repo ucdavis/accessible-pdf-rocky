@@ -1,0 +1,41 @@
+# Node / frontend
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+
+# Build outputs
+.next/
+dist/
+out/
+.cache/
+coverage/
+*.tsbuildinfo
+.wrangler/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE/editor
+.idea/
+.vscode/
+.DS_Store
+
+# Env
+.env
+.env.*
+*.pem
+
+# Logs
+*.log
+logs/
+
+# Spelling
+.cspellcache
