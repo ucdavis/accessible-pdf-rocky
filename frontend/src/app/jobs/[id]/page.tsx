@@ -1,4 +1,9 @@
-export default function JobDetail({ params }: { params: { id: string } }) {
+export default async function JobDetail({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
       <main className="flex w-full max-w-4xl flex-col gap-8 p-8">
@@ -7,7 +12,7 @@ export default function JobDetail({ params }: { params: { id: string } }) {
             Job Details
           </h1>
           <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-            Job ID: {params.id}
+            Job ID: {id}
           </p>
         </div>
 

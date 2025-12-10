@@ -278,7 +278,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for infrastructure details.
 
 **Problem:** Adobe often gets reading order wrong in complex layouts
 
-**Solution:** Fine-tuned sequence prediction model with 98%+ accuracy
+**Solution:** Fine-tuned sequence prediction model with high accuracy
 
 ### 3. Meaningful Alt-Text
 
@@ -306,7 +306,7 @@ LayoutLMv3, BLIP-2, LLaVA are open-source and production-ready (2023-2024).
 
 ### 2. Compute Accessibility
 
-Universities already have HPC clusters with idle GPU capacity.
+We already have HPC clusters with idle GPU capacity. Buying cloud GPU is expensive.
 
 ### 3. Legal Pressure
 
