@@ -59,6 +59,70 @@ class TestDBModels:
         # Should be in UTC timezone
         assert result.tzinfo == timezone.utc
 
+    def test_job_model_fields_and_defaults(self):
+        """Test Job model field definitions and default values."""
+        from uuid import UUID
+        from db.models import Job, JobStatus
+
+        job = Job(r2_key="test/key.pdf")
+
+        # Check types and defaults
+        assert isinstance(job.id, UUID)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.r2_key == "test/key.pdf"
+        assert job.slurm_id is None
+        assert job.results_url is None
+        assert job.user_id is None
+        # Timestamps should be auto-populated
+        assert job.created_at is not None
+        assert job.updated_at is not None
+        # Timestamps should be timezone-aware
+        assert job.created_at.tzinfo is not None
+        assert job.updated_at.tzinfo is not None
+
+    def test_user_model_fields_and_defaults(self):
+        """Test User model field definitions and default values."""
+        from uuid import UUID
+        from db.models import User
+
+        user = User(email="test@example.com")
+
+        # Check types and defaults
+        assert isinstance(user.id, UUID)
+        assert user.email == "test@example.com"
+        assert user.name is None
+        assert user.organization is None
+        assert user.is_active is True
+        # Timestamp should be auto-populated
+        assert user.created_at is not None
+        # Timestamp should be timezone-aware
+        assert user.created_at.tzinfo is not None
+
+    def test_processing_metrics_model_fields_and_defaults(self):
+        """Test ProcessingMetrics model field definitions and default values."""
+        from uuid import UUID
+        from db.models import ProcessingMetrics
+
+        # Need a job_id UUID for the foreign key
+        from uuid import uuid4
+
+        job_id = uuid4()
+
+        metrics = ProcessingMetrics(job_id=job_id)
+
+        # Check types and defaults
+        assert isinstance(metrics.id, UUID)
+        assert metrics.job_id == job_id
+        assert metrics.processing_time_seconds is None
+        assert metrics.pdf_pages is None
+        assert metrics.pdf_size_bytes is None
+        assert metrics.success is False
+        assert metrics.error_message is None
+        # Timestamp should be auto-populated
+        assert metrics.created_at is not None
+        # Timestamp should be timezone-aware
+        assert metrics.created_at.tzinfo is not None
+
 
 class TestDBSession:
     """Tests for db/session.py"""

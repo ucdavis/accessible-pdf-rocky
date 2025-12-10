@@ -14,11 +14,14 @@ DATABASE_URL = os.getenv(
 # Control SQL query logging (useful for debugging, noisy in production)
 DB_ECHO = os.getenv("DB_ECHO", "false").lower() in ("true", "1", "yes")
 
-# Create async engine
+# Create async engine with connection pooling
 engine = create_async_engine(
     DATABASE_URL,
     echo=DB_ECHO,
     future=True,
+    pool_size=20,  # Maximum number of connections to keep in the pool
+    max_overflow=10,  # Additional connections to create under load
+    pool_pre_ping=True,  # Verify connections before using (catches stale connections)
 )
 
 # Create async session factory
@@ -29,8 +32,8 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency for getting async database sessions.
 
-    Note: This auto-commits after successful request completion.
-    For read-only operations, the commit is a no-op but harmless.
+    Note: Commits only if changes are pending (dirty, new, or deleted objects).
+    This avoids unnecessary commit overhead for read-only operations.
 
     Example usage in FastAPI:
         @app.get("/items")
@@ -41,7 +44,9 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session() as session:
         try:
             yield session
-            await session.commit()
+            # Only commit if there are pending changes
+            if session.dirty or session.new or session.deleted:
+                await session.commit()
         except Exception:
             await session.rollback()
             raise

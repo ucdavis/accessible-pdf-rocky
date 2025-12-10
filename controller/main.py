@@ -11,9 +11,13 @@ from db.session import get_session, init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize database on startup."""
+    """Initialize database on startup and dispose engine on shutdown."""
     await init_db()
     yield
+    # Dispose engine on shutdown
+    from db.session import engine
+
+    await engine.dispose()
 
 
 app = FastAPI(lifespan=lifespan)

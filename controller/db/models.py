@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID, uuid4
 
+from sqlalchemy import Column, DateTime
 from sqlmodel import Field, SQLModel
 
 
@@ -32,7 +33,10 @@ class Job(SQLModel, table=True):
     status: JobStatus = Field(default=JobStatus.SUBMITTED, index=True)
     r2_key: str = Field(index=True)
     created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now),
+    )
     results_url: Optional[str] = Field(default=None)
     user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
 
