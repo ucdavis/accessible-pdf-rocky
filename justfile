@@ -412,6 +412,11 @@ typecheck: _ensure-npm
 validate-yaml: _ensure-uv
     #!/usr/bin/env bash
     set -euo pipefail
+    if ! uv run yamllint --version >/dev/null 2>&1; then
+        echo "⚠️ 'yamllint' not found in uv environment, skipping YAML validation"
+        echo "   Install: uv tool install yamllint"
+        exit 0
+    fi
     files=()
     while IFS= read -r -d '' file; do
         files+=("$file")
