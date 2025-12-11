@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using server.HealthChecks;
 using server.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +15,10 @@ builder.Configuration
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Capture logger before building the app
+var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+var logger = loggerFactory.CreateLogger<Program>();
 
 // Configure CORS for React client
 builder.Services.AddCors(options =>
@@ -40,9 +46,9 @@ builder.Services.AddCors(options =>
             }
             else
             {
-                // Log warning if no CORS origins configured in non-development
-                Console.WriteLine("WARNING: No CORS allowed origins configured. Cross-origin requests will be blocked.");
-                Console.WriteLine("         Configure 'Cors:AllowedOrigins' in appsettings.Production.json or environment variables.");
+                logger.LogWarning(
+                    "No CORS allowed origins configured. Cross-origin requests will be blocked. " +
+                    "Configure 'Cors:AllowedOrigins' in appsettings.Production.json or environment variables.");
             }
         }
     });
@@ -55,6 +61,14 @@ builder.Services.AddHttpClient<IDatabaseApiClient, DatabaseApiClient>((servicePr
     var baseUrl = config["DB_API_URL"] ?? config["DatabaseApi:BaseUrl"] ?? "http://localhost:8787";
     var token = config["DB_API_TOKEN"] ?? config["DatabaseApi:Token"] ?? string.Empty;
     
+    if (string.IsNullOrEmpty(token))
+    {
+        var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogWarning(
+            "Database API token not configured. Authentication will fail. " +
+            "Configure 'DB_API_TOKEN' or 'DatabaseApi:Token' in configuration.");
+    }
+    
     client.BaseAddress = new Uri(baseUrl.TrimEnd('/'));
     if (!string.IsNullOrEmpty(token))
     {
@@ -64,6 +78,10 @@ builder.Services.AddHttpClient<IDatabaseApiClient, DatabaseApiClient>((servicePr
 });
 
 builder.Services.AddHttpClient<IMetricsClient, MetricsClient>();
+
+// Register health checks
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseApiHealthCheck>("database_api", tags: new[] { "ready" });
 
 var app = builder.Build();
 
@@ -85,7 +103,20 @@ app.UseHttpsRedirection();
 app.UseCors("AllowClient");
 app.MapControllers();
 
-// Health check endpoint
+// Health check endpoints
+// Liveness probe - basic check that the app is running
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false // Don't run any checks, just return healthy if app is running
+});
+
+// Readiness probe - checks dependencies (database API)
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+});
+
+// Legacy health endpoint for backward compatibility
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 // Minimal error endpoint for production exception handling

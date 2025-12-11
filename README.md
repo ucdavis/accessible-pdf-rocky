@@ -57,6 +57,22 @@ just commit-check
 just help
 ```
 
+## Dev Container
+
+For a consistent development environment, use the provided Dev Container configuration:
+
+**VS Code:**
+1. Install the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+2. Open this project in VS Code
+3. Click "Reopen in Container" when prompted
+
+**GitHub Codespaces:**
+1. Click the green "Code" button on GitHub
+2. Select the "Codespaces" tab
+3. Click "Create codespace on [branch]"
+
+The dev container includes Node.js, .NET SDK, Python/uv, and all required VS Code extensions. See [.devcontainer/README.md](.devcontainer/README.md) for details.
+
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) - System design and data flow

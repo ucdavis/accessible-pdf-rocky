@@ -419,7 +419,7 @@ setup:
     echo "Installing dependencies..."
     
     # .NET restore
-    if [ -d "server" ]; then
+    if [ -f "app.sln" ]; then
         echo "  Restoring .NET packages..."
         dotnet restore
     fi
