@@ -1,5 +1,7 @@
 // API client for .NET server endpoints
 
+// In development: defaults to '/api' (relative path) which uses Vite proxy to forward to http://localhost:5165/api
+// In production: set VITE_API_URL to full URL like 'https://api.yourdomain.com/api'
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export interface Job {
@@ -25,8 +27,15 @@ export async function getJobStatus(jobId: string): Promise<Job> {
   const response = await fetch(`${API_BASE_URL}/job/status/${jobId}`);
   
   if (!response.ok) {
-    const error: ApiError = await response.json();
-    throw new Error(error.detail || 'Failed to fetch job status');
+    let errorMessage: string;
+    try {
+      const error: ApiError = await response.json();
+      errorMessage = error.detail || 'Failed to fetch job status';
+    } catch {
+      // If response isn't JSON, use status text
+      errorMessage = `Failed to fetch job status: ${response.statusText}`;
+    }
+    throw new Error(errorMessage);
   }
   
   return response.json();
@@ -56,8 +65,15 @@ export async function listJobs(params?: {
   const response = await fetch(url);
   
   if (!response.ok) {
-    const error: ApiError = await response.json();
-    throw new Error(error.detail || 'Failed to fetch jobs');
+    let errorMessage: string;
+    try {
+      const error: ApiError = await response.json();
+      errorMessage = error.detail || 'Failed to fetch jobs';
+    } catch {
+      // If response isn't JSON, use status text
+      errorMessage = `Failed to fetch jobs: ${response.statusText}`;
+    }
+    throw new Error(errorMessage);
   }
   
   return response.json();

@@ -88,9 +88,10 @@ update: _ensure-npm _ensure-uv _ensure-dotnet
     echo "Updating all dependencies..."
     echo ""
     
-    # Update .NET packages
+    # Restore .NET packages (note: dotnet restore doesn't bump versions)
+    # To update NuGet packages, use: dotnet add package <PackageName> or dotnet-outdated tool
     if [ -d "server" ]; then
-        echo "Updating .NET packages..."
+        echo "Restoring .NET packages..."
         dotnet restore
         echo ""
     fi
@@ -147,8 +148,12 @@ clean:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Cleaning build artifacts..."
-    # .NET artifacts
-    find . -type d \( -name "bin" -o -name "obj" \) -not -path "*/node_modules/*" -prune -exec rm -rf {} + 2>/dev/null || true
+    # .NET artifacts (scoped to known project directories)
+    for dir in server server.core tests/server.tests; do
+        if [ -d "$dir" ]; then
+            find "$dir" -type d \( -name "bin" -o -name "obj" \) -prune -exec rm -rf {} + 2>/dev/null || true
+        fi
+    done
     # Node modules and build artifacts
     [ -d "client/node_modules" ] && rm -rf client/node_modules
     [ -d "client/dist" ] && rm -rf client/dist
@@ -465,9 +470,9 @@ test-js: _ensure-npm
 test-js-coverage: _ensure-npm
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
-        echo "Testing frontend with coverage..."
-        cd frontend && npm run test:coverage && cd ..
+    if [ -d "client" ] && [ -f "client/package.json" ]; then
+        echo "Testing client with coverage..."
+        cd client && npm run test:coverage && cd ..
     fi
     if [ -d "workers" ] && [ -f "workers/package.json" ]; then
         echo "Testing workers with coverage..."
@@ -478,10 +483,6 @@ test-js-coverage: _ensure-npm
 test-python: _ensure-uv
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -d "controller" ] && [ -f "controller/pyproject.toml" ]; then
-        echo "Testing controller..."
-        cd controller && uv run pytest && cd ..
-    fi
     if [ -d "hpc_runner" ] && [ -f "hpc_runner/pyproject.toml" ]; then
         echo "Testing hpc_runner..."
         cd hpc_runner && uv run pytest && cd ..
@@ -491,10 +492,6 @@ test-python: _ensure-uv
 test-python-coverage: _ensure-uv
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -d "controller" ] && [ -f "controller/pyproject.toml" ]; then
-        echo "Testing controller with coverage..."
-        cd controller && uv run pytest --cov=. --cov-report=html --cov-report=term && cd ..
-    fi
     if [ -d "hpc_runner" ] && [ -f "hpc_runner/pyproject.toml" ]; then
         echo "Testing hpc_runner with coverage..."
         cd hpc_runner && uv run pytest --cov=. --cov-report=html --cov-report=term && cd ..
@@ -504,9 +501,9 @@ test-python-coverage: _ensure-uv
 typecheck: _ensure-npm
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -d "frontend" ]; then
-        echo "Type checking frontend..."
-        cd frontend && npx tsc --noEmit && cd ..
+    if [ -d "client" ]; then
+        echo "Type checking client..."
+        cd client && npx tsc --noEmit && cd ..
     fi
     if [ -d "workers" ]; then
         echo "Type checking workers..."

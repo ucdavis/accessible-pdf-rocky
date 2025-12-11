@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using server.core.Domain;
@@ -37,7 +38,13 @@ public class DatabaseApiClient : IDatabaseApiClient
                  ?? string.Empty;
 
         _httpClient.BaseAddress = new Uri(_baseUrl.TrimEnd('/'));
-        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_token}");
+        
+        // Only set authorization if token is provided
+        if (!string.IsNullOrEmpty(_token))
+        {
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+        }
+        
         _httpClient.Timeout = TimeSpan.FromSeconds(30);
     }
 
@@ -112,12 +119,12 @@ public class DatabaseApiClient : IDatabaseApiClient
 
     public async Task<List<Job>> ListJobsAsync(JobStatus? status = null, Guid? userId = null, int limit = 100, CancellationToken cancellationToken = default)
     {
-        var queryParams = new List<string> { $"limit={limit}" };
+        var queryParams = new List<string> { $"limit={Uri.EscapeDataString(limit.ToString())}" };
         
         if (status.HasValue)
-            queryParams.Add($"status={status.Value.ToString().ToLowerInvariant()}");
+            queryParams.Add($"status={Uri.EscapeDataString(status.Value.ToString().ToLowerInvariant())}");
         if (userId.HasValue)
-            queryParams.Add($"user_id={userId}");
+            queryParams.Add($"user_id={Uri.EscapeDataString(userId.ToString()!)}");
 
         var query = string.Join("&", queryParams);
         var response = await _httpClient.GetAsync($"/jobs?{query}", cancellationToken);
@@ -134,27 +141,54 @@ public class DatabaseApiClient : IDatabaseApiClient
     {
         var now = DateTime.UtcNow;
 
-        return new Job
+        try
         {
-            Id = Guid.Parse(data["id"].GetString() ?? throw new InvalidOperationException("Job ID is required")),
-            SlurmId = data.ContainsKey("slurm_id") && data["slurm_id"].ValueKind != JsonValueKind.Null 
-                ? data["slurm_id"].GetString() 
-                : null,
-            Status = Enum.Parse<JobStatus>(data["status"].GetString() ?? "Submitted", ignoreCase: true),
-            R2Key = data["r2_key"].GetString() ?? string.Empty,
-            CreatedAt = data.ContainsKey("created_at") && data["created_at"].ValueKind != JsonValueKind.Null
-                ? DateTimeOffset.FromUnixTimeSeconds(data["created_at"].GetInt64()).UtcDateTime
-                : now,
-            UpdatedAt = data.ContainsKey("updated_at") && data["updated_at"].ValueKind != JsonValueKind.Null
-                ? DateTimeOffset.FromUnixTimeSeconds(data["updated_at"].GetInt64()).UtcDateTime
-                : now,
-            ResultsUrl = data.ContainsKey("results_url") && data["results_url"].ValueKind != JsonValueKind.Null
-                ? data["results_url"].GetString()
-                : null,
-            UserId = data.ContainsKey("user_id") && data["user_id"].ValueKind != JsonValueKind.Null
-                ? Guid.Parse(data["user_id"].GetString()!)
-                : null,
-            Error = null
-        };
+            // Required fields
+            if (!data.TryGetValue("id", out var idElement))
+            {
+                _logger.LogError("Missing required field 'id' in job data");
+                throw new InvalidOperationException("Job data is missing required 'id' field");
+            }
+            
+            if (!data.TryGetValue("status", out var statusElement))
+            {
+                _logger.LogError("Missing required field 'status' in job data");
+                throw new InvalidOperationException("Job data is missing required 'status' field");
+            }
+            
+            if (!data.TryGetValue("r2_key", out var r2KeyElement))
+            {
+                _logger.LogError("Missing required field 'r2_key' in job data");
+                throw new InvalidOperationException("Job data is missing required 'r2_key' field");
+            }
+
+            return new Job
+            {
+                Id = Guid.Parse(idElement.GetString() ?? throw new InvalidOperationException("Job ID cannot be null")),
+                SlurmId = data.TryGetValue("slurm_id", out var slurmIdElement) && slurmIdElement.ValueKind != JsonValueKind.Null 
+                    ? slurmIdElement.GetString() 
+                    : null,
+                Status = Enum.Parse<JobStatus>(statusElement.GetString() ?? "Submitted", ignoreCase: true),
+                R2Key = r2KeyElement.GetString() ?? string.Empty,
+                CreatedAt = data.TryGetValue("created_at", out var createdAtElement) && createdAtElement.ValueKind != JsonValueKind.Null
+                    ? DateTimeOffset.FromUnixTimeSeconds(createdAtElement.GetInt64()).UtcDateTime
+                    : now,
+                UpdatedAt = data.TryGetValue("updated_at", out var updatedAtElement) && updatedAtElement.ValueKind != JsonValueKind.Null
+                    ? DateTimeOffset.FromUnixTimeSeconds(updatedAtElement.GetInt64()).UtcDateTime
+                    : now,
+                ResultsUrl = data.TryGetValue("results_url", out var resultsUrlElement) && resultsUrlElement.ValueKind != JsonValueKind.Null
+                    ? resultsUrlElement.GetString()
+                    : null,
+                UserId = data.TryGetValue("user_id", out var userIdElement) && userIdElement.ValueKind != JsonValueKind.Null
+                    ? Guid.Parse(userIdElement.GetString()!)
+                    : null,
+                Error = null
+            };
+        }
+        catch (Exception ex) when (ex is not InvalidOperationException)
+        {
+            _logger.LogError(ex, "Failed to map job data from database API response");
+            throw new InvalidOperationException("Failed to deserialize job data from database API", ex);
+        }
     }
 }

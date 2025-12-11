@@ -421,7 +421,7 @@ public class SlurmSubmitter
 
 ### 4. SLURM Batch Script (GPU inference)
 
-#### hpc/scripts/job.sh
+#### hpc_runner/scripts/job.sh
 
 ```bash
 #!/bin/bash
@@ -466,7 +466,7 @@ import argparse
 import sys
 from pathlib import Path
 
-def analyze_pdf(pdf_path: str, job_id: str) -> dict:
+async def analyze_pdf(pdf_path: str, job_id: str) -> dict:
     """
     Analyze a PDF file for accessibility issues using two-layer architecture.
     
@@ -533,7 +533,8 @@ def main():
         sys.exit(1)
     
     # Run analysis
-    results = analyze_pdf(args.pdf_path, args.job_id)
+    import asyncio
+    results = asyncio.run(analyze_pdf(args.pdf_path, args.job_id))
     
     # Write results
     if args.output:
@@ -548,7 +549,7 @@ if __name__ == "__main__":
 
 ### 6. SLURM Status Monitoring
 
-#### hpc/status.py
+#### hpc_runner/status.py
 
 ```python
 import subprocess

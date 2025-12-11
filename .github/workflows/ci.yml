@@ -38,14 +38,14 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
-      - name: Run tests
-        run: dotnet test --no-restore --verbosity normal /p:CollectCoverage=true /p:CoverletOutputFormat=lcov
+      - name: Run tests with coverage
+        run: dotnet test --no-restore --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./tests/server.tests/coverage.info
+          files: ./coverage/**/coverage.cobertura.xml
           flags: dotnet-server
           fail_ci_if_error: false
 
@@ -138,7 +138,7 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./client/coverage/coverage-final.json
+          files: ./client/coverage/lcov.info
           flags: client
           fail_ci_if_error: false
 

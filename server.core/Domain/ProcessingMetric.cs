@@ -19,8 +19,11 @@ public class ProcessingMetric
     [JsonPropertyName("pdfPages")]
     public int? PdfPages { get; set; }
 
+    /// <summary>
+    /// PDF file size in bytes. Uses long to support files >2GB.
+    /// </summary>
     [JsonPropertyName("pdfSizeBytes")]
-    public int? PdfSizeBytes { get; set; }
+    public long? PdfSizeBytes { get; set; }
 
     [JsonPropertyName("success")]
     public bool Success { get; set; }
@@ -28,6 +31,9 @@ public class ProcessingMetric
     [JsonPropertyName("errorMessage")]
     public string? ErrorMessage { get; set; }
 
+    /// <summary>
+    /// Timestamp of metric creation. Should be stored and handled as UTC.
+    /// </summary>
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 }

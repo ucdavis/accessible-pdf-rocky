@@ -9,7 +9,7 @@ The project uses a comprehensive testing strategy with:
 - **.NET**: xUnit with coverage tracking
 - **Python**: pytest for HPC runner tests
 - **JavaScript/TypeScript**: Vitest for client and worker tests
-- **CI/CD**: Azure Pipelines for automated testing
+- **CI/CD**: GitHub Actions for automated testing
 - **Coverage**: Codecov integration for coverage reports
 
 ## Running Tests
@@ -233,15 +233,16 @@ Tests run automatically on:
 - Every pull request
 - Schedule (weekly)
 
-### Azure Pipelines
+### GitHub Actions
 
-- `azure-pipelines.yml` - Main CI/CD pipeline (tests + linting + deployment)
+- `.github/workflows/ci.yml` - Main CI/CD pipeline (tests + linting + build)
+- `.github/workflows/security.yml` - Security scanning (npm audit, dotnet audit, Python safety)
 - Separate jobs for .NET, Python, and TypeScript tests
 - Parallel test execution for faster feedback
 
-### Pipeline Status
+### Workflow Status
 
-View test results in Azure DevOps portal
+View test results in the GitHub Actions tab or PR checks
 
 ## Best Practices
 

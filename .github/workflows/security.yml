@@ -9,12 +9,30 @@ on:
     - cron: '0 0 * * 0'  # Weekly on Sunday at midnight UTC
 
 jobs:
+  dotnet-audit:
+    name: .NET Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Check for vulnerable packages
+        run: dotnet list package --vulnerable --include-transitive
+        continue-on-error: true
+
   npm-audit:
     name: NPM Security Audit
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        directory: [frontend, workers]
+        directory: [client, workers]
     steps:
       - uses: actions/checkout@v6
 
@@ -34,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        directory: [controller, hpc_runner]
+        directory: [hpc_runner]
     steps:
       - uses: actions/checkout@v6
 

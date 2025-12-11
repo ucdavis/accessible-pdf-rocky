@@ -68,7 +68,7 @@
     "drivername",
     "Donut",
     "downstreams",
-    "ebug",
+    "debug",
     "elif",
     "endfor",
     "endgroup",
@@ -191,10 +191,11 @@
     "topk",
     "tsconfig",
     "turbofish",
-    "uild",
+    "build",
     "typechecking",
     "ucdavis",
     "unflake",
+    "unstub",
     "untagged",
     "userosscache",
     "uvicorn",
@@ -219,7 +220,7 @@
     "zenodo",
     "Swashbuckle",
     "zxvf",
-    "elease"
+    "Release"
   ],
   "flagWords": [],
   "overrides": [

@@ -47,7 +47,23 @@ function JobDetailComponent() {
   }
 
   if (!job) {
-    return null;
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="rounded-md bg-yellow-50 p-4 dark:bg-yellow-900/20">
+          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+            Job not found.
+          </p>
+        </div>
+        <div className="mt-6">
+          <Link
+            to="/jobs"
+            className="text-sm font-semibold text-zinc-900 dark:text-zinc-50"
+          >
+            ← Back to jobs
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -28,11 +28,11 @@ Designed for UC Davis document remediation needs.
 
 ## Repository Structure
 
-- `client/` – React/Vite UI (to be implemented)
+- `client/` – [React 19](https://react.dev/) + [Vite](https://vite.dev/) frontend with [TanStack Router](https://tanstack.com/router) and [Query](https://tanstack.com/query)
 - `hpc_runner/` – SLURM job runner (heavy ML + PDF, Python)
 - `server/` – [.NET 8](https://dotnet.microsoft.com/) Web API bridge to HPC cluster
 - `server.core/` – Domain models and shared logic
-- `tests/` – .NET test project
+- `tests/` – .NET test project with xUnit
 - `workers/` – [Cloudflare Workers](https://developers.cloudflare.com/workers/) (R2 + Queues, TypeScript)
 
 ## Quick Start

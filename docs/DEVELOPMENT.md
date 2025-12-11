@@ -146,11 +146,30 @@ Metrics__Token=dev-token
 
 ### Client (.env)
 
+The client can be configured in two ways:
+
+**Option 1: Use Vite proxy (recommended for development)**
+
+No `.env` file needed. Vite automatically proxies `/api/*` requests to the .NET server:
+
+```typescript
+// vite.config.ts already configured:
+proxy: {
+  '^/api': {
+    target: 'http://localhost:5165',
+  },
+}
+```
+
+**Option 2: Direct API access**
+
 Create `client/.env`:
 
 ```bash
-VITE_API_URL=http://localhost:5165
+VITE_API_URL=http://localhost:5165/api
 ```
+
+**Note:** The `/api` prefix is required because the .NET API controller routes are mounted at `/api/job/...`. The client code defaults to `/api` if `VITE_API_URL` is not set, which works with the Vite proxy in development.
 
 ## Testing Cloudflare Workers Locally
 
@@ -247,8 +266,8 @@ just dev-logs
 
 Local:
 
-- Frontend: Check terminal
-- Controller: Check terminal or `.NET server/logs/`
+- Client: Check terminal
+- Server: Check terminal or `server/logs/`
 
 ## API Development
 

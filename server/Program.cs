@@ -14,6 +14,34 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Configure CORS for React client
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowClient", policy =>
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            // In development, allow the React dev server
+            policy
+                .WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
+        else
+        {
+            // In production, get allowed origins from configuration
+            var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+            if (allowedOrigins.Length > 0)
+            {
+                policy
+                    .WithOrigins(allowedOrigins)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+            }
+        }
+    });
+});
+
 // Register services
 builder.Services.AddHttpClient<IDatabaseApiClient, DatabaseApiClient>();
 builder.Services.AddHttpClient<IMetricsClient, MetricsClient>();
@@ -27,6 +55,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseCors("AllowClient");
 app.MapControllers();
 
 app.Run();

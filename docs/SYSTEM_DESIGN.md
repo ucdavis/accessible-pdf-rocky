@@ -317,9 +317,9 @@ flowchart LR
 
 ### Two-Layer Orchestration
 
-**Layer 1: Controller (Cloudflare ↔ HPC ↔ [R2](https://developers.cloudflare.com/r2/) Flow)**
+**Layer 1: .NET API Server (Cloudflare ↔ HPC ↔ [R2](https://developers.cloudflare.com/r2/) Flow)**
 
-The `.NET API services/` layer orchestrates job flow between components:
+The `.NET API server/Services/` layer orchestrates job flow between components:
 
 - Pulls jobs from [Cloudflare Queue](https://developers.cloudflare.com/queues/)
 - Downloads PDFs from [R2](https://developers.cloudflare.com/r2/)
@@ -402,9 +402,9 @@ def analyze_pdf(pdf_path: str, job_id: str) -> dict:
     }
 ```
 
-### Service Layer Organization (Controller)
+### Service Layer Organization (.NET API Server)
 
-Runs on [.NET 8 Web API](https://fastapi.tiangolo.com/) controller, orchestrates Cloudflare ↔ HPC ↔ [R2](https://developers.cloudflare.com/r2/):
+Runs on [.NET 8 Web API](https://learn.microsoft.com/en-us/aspnet/core/web-api/) server, orchestrates Cloudflare ↔ HPC ↔ [R2](https://developers.cloudflare.com/r2/):
 
 ```
 server/Services/
@@ -443,7 +443,7 @@ hpc_runner/
 
 **Key Distinction:**
 
-- `.NET API services/` = Lightweight orchestration, no heavy ML
+- `.NET API server/Services/` = Lightweight orchestration, no heavy ML
 - `hpc_runner/` = Heavy GPU-based ML processing
 
 #### HPC Runner Internal Architecture: ai/ vs processors/
@@ -842,15 +842,18 @@ CREATE TABLE alt_texts (
 .NET API → HTTP API → D1 Worker → D1 Database
 
 ```csharp
-// server/Services/DatabaseApiClient.cs
-var dbClient = new DatabaseApiClient(httpClient, config);
+// server/Services/DatabaseApiClient.cs (actual implementation)
+var dbClient = new DatabaseApiClient(httpClient, config, logger);
 
-var job = await dbClient.CreateJobAsync(new CreateJobRequest
-{
-    JobId = Guid.NewGuid().ToString(),
-    R2Key = "uploads/document.pdf",
-    Status = "submitted"
-});
+var job = await dbClient.CreateJobAsync(
+    jobId: Guid.NewGuid(),
+    r2Key: "uploads/document.pdf",
+    slurmId: null,
+    userId: null,
+    cancellationToken: default
+);
+
+// Returns Job object with Status automatically set to "Submitted"
 ```
 
 See `workers/db-api/README.md` for API documentation.

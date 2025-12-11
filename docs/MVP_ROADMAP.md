@@ -50,8 +50,8 @@ View milestone: <https://github.com/ucdavis/accessible-pdf-rocky/milestone/1>
 
 ### Phase 2: Backend Foundation (Issues #5, #6, #8)
 
-1. Implement queue listener in controller
-2. SLURM job submission
+1. Implement queue listener in .NET API
+2. SLURM job submission from .NET API
 3. Status API endpoint
 
 ### Phase 3: Processing (Issue #7)
@@ -60,8 +60,8 @@ View milestone: <https://github.com/ucdavis/accessible-pdf-rocky/milestone/1>
 
 ### Phase 4: Frontend (Issues #1, #9)
 
-1. Upload UI
-2. Status polling and results
+1. React client upload UI
+2. React client status polling and results display
 
 ### Phase 5: Validation (Issue #10)
 

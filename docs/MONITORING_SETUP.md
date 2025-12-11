@@ -79,7 +79,7 @@ See [Metrics Deployment](METRICS_DEPLOYMENT.md) for setup instructions.
 
 ```bash
 # 1. Install SLURM metrics export script
-sudo cp .NET server/hpc/scripts/export_slurm_metrics.sh /usr/local/bin/
+sudo cp hpc_runner/scripts/export_slurm_metrics.sh /usr/local/bin/
 sudo chmod 755 /usr/local/bin/export_slurm_metrics.sh
 sudo chown root:root /usr/local/bin/export_slurm_metrics.sh
 

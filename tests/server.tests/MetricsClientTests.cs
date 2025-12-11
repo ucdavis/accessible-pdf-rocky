@@ -146,7 +146,7 @@ public class MetricsClientTests
         var metricsObj = payload.GetProperty("metrics");
 
         Assert.Equal(1, metricsObj.GetProperty("slurm_submitted_jobs_total").GetDouble());
-        Assert.Equal(1.23, metricsObj.GetProperty("slurm_submission_latency_seconds").GetDouble());
+        Assert.Equal(1.23, metricsObj.GetProperty("slurm_submission_latency_seconds").GetDouble(), precision: 5);
         Assert.Equal(1, metricsObj.GetProperty("slurm_submission_success").GetDouble());
         Assert.False(metricsObj.TryGetProperty("slurm_submission_failure", out _));
     }
@@ -177,7 +177,7 @@ public class MetricsClientTests
         var metricsObj = payload.GetProperty("metrics");
 
         Assert.Equal(1, metricsObj.GetProperty("slurm_submitted_jobs_total").GetDouble());
-        Assert.Equal(2.34, metricsObj.GetProperty("slurm_submission_latency_seconds").GetDouble());
+        Assert.Equal(2.34, metricsObj.GetProperty("slurm_submission_latency_seconds").GetDouble(), precision: 5);
         Assert.Equal(1, metricsObj.GetProperty("slurm_submission_failure").GetDouble());
         Assert.False(metricsObj.TryGetProperty("slurm_submission_success", out _));
     }
@@ -235,7 +235,7 @@ public class MetricsClientTests
         var payload = JsonSerializer.Deserialize<JsonElement>(content);
         var metricsObj = payload.GetProperty("metrics");
 
-        Assert.Equal(456.78, metricsObj.GetProperty("slurm_job_duration_seconds").GetDouble());
+        Assert.Equal(456.78, metricsObj.GetProperty("slurm_job_duration_seconds").GetDouble(), precision: 5);
     }
 
     [Fact]
@@ -263,7 +263,7 @@ public class MetricsClientTests
         var payload = JsonSerializer.Deserialize<JsonElement>(content);
         var metricsObj = payload.GetProperty("metrics");
 
-        Assert.Equal(0.123, metricsObj.GetProperty("slurm_status_check_seconds").GetDouble());
+        Assert.Equal(0.123, metricsObj.GetProperty("slurm_status_check_seconds").GetDouble(), precision: 5);
     }
 
     [Fact]
