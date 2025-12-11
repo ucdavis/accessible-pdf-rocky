@@ -49,7 +49,20 @@ builder.Services.AddCors(options =>
 });
 
 // Register services
-builder.Services.AddHttpClient<IDatabaseApiClient, DatabaseApiClient>();
+builder.Services.AddHttpClient<IDatabaseApiClient, DatabaseApiClient>((serviceProvider, client) =>
+{
+    var config = serviceProvider.GetRequiredService<IConfiguration>();
+    var baseUrl = config["DB_API_URL"] ?? config["DatabaseApi:BaseUrl"] ?? "http://localhost:8787";
+    var token = config["DB_API_TOKEN"] ?? config["DatabaseApi:Token"] ?? string.Empty;
+    
+    client.BaseAddress = new Uri(baseUrl.TrimEnd('/'));
+    if (!string.IsNullOrEmpty(token))
+    {
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+    }
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
 builder.Services.AddHttpClient<IMetricsClient, MetricsClient>();
 
 var app = builder.Build();

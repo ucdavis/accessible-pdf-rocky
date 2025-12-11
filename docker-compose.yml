@@ -3,6 +3,7 @@ services:
   db-api:
     image: node:20
     working_dir: /app
+    restart: unless-stopped
     ports:
       - "8787:8787"
     volumes:
@@ -14,12 +15,15 @@ services:
   server:
     image: mcr.microsoft.com/dotnet/sdk:8.0
     working_dir: /app
+    restart: unless-stopped
     ports:
       - "5165:5165"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:5165
       DB_API_URL: http://db-api:8787
+      # NOTE: This dev token is for local development only and must not be used in production.
+      # Use environment variables or secrets management in production.
       DB_API_TOKEN: dev-token
       # Metrics are optional - uncomment and add metrics-ingest service if needed
       # METRICS_ENDPOINT: http://metrics-ingest:8788/ingest
@@ -35,6 +39,7 @@ services:
   client:
     image: node:20
     working_dir: /app
+    restart: unless-stopped
     ports:
       - "5173:5173"
     environment:

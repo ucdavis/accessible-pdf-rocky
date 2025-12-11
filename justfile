@@ -64,19 +64,29 @@ audit: _ensure-npm _ensure-uv
     # NPM audit for client and workers
     if [ -d "client" ]; then
         echo "Auditing client npm packages..."
-        cd client && npm audit --audit-level=moderate || true && cd ..
+        (
+            cd client
+            npm audit --audit-level=moderate || true
+        )
         echo ""
     fi
     if [ -d "workers" ]; then
         echo "Auditing workers npm packages..."
-        cd workers && npm audit --audit-level=moderate || true && cd ..
+        (
+            cd workers
+            npm audit --audit-level=moderate || true
+        )
         echo ""
     fi
     
     # Python pip-audit for hpc_runner
     if [ -d "hpc_runner" ]; then
         echo "Auditing hpc_runner Python packages..."
-        cd hpc_runner && uv pip install --quiet pip-audit && uv run pip-audit || true && cd ..
+        (
+            cd hpc_runner
+            uv pip install --quiet pip-audit
+            uv run pip-audit || true
+        )
         echo ""
     fi
     
@@ -100,21 +110,31 @@ update: _ensure-npm _ensure-uv _ensure-dotnet
     # Update npm packages for client
     if [ -d "client" ]; then
         echo "Updating client npm packages..."
-        cd client && npm update && cd ..
+        (
+            cd client
+            npm update
+        )
         echo ""
     fi
     
     # Update npm packages for workers
     if [ -d "workers" ]; then
         echo "Updating workers npm packages..."
-        cd workers && npm update && cd ..
+        (
+            cd workers
+            npm update
+        )
         echo ""
     fi
     
     # Update Python packages for hpc_runner
     if [ -d "hpc_runner" ]; then
         echo "Updating hpc_runner Python packages..."
-        cd hpc_runner && uv lock --upgrade && uv sync && cd ..
+        (
+            cd hpc_runner
+            uv lock --upgrade
+            uv sync
+        )
         echo ""
     fi
     
@@ -124,20 +144,26 @@ update: _ensure-npm _ensure-uv _ensure-dotnet
 build: _ensure-npm _ensure-dotnet
     #!/usr/bin/env bash
     set -euo pipefail
-    # Build .NET server
-    if [ -d "server" ]; then
-        echo "Building .NET server..."
-        dotnet build
+    # Build .NET solution
+    if [ -f "app.sln" ]; then
+        echo "Building .NET solution..."
+        dotnet build app.sln
     fi
     # Build React client
     if [ -d "client" ]; then
         echo "Building client..."
-        cd client && npm run build && cd ..
+        (
+            cd client
+            npm run build
+        )
     fi
     # Build workers
     if [ -d "workers" ]; then
         echo "Building workers..."
-        cd workers && npm run build && cd ..
+        (
+            cd workers
+            npm run build
+        )
     fi
 
 # CI simulation: quality checks with comprehensive testing (fast, matches GitHub Actions)
@@ -238,10 +264,12 @@ help:
 dotnet-lint: _ensure-dotnet
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -d "server" ]; then
-        echo "Linting .NET projects..."
-        dotnet build /p:TreatWarningsAsErrors=true
+    if [ ! -f "app.sln" ]; then
+        echo "❌ app.sln not found; expected for .NET linting" >&2
+        exit 1
     fi
+    echo "Linting .NET projects..."
+    dotnet build app.sln /p:TreatWarningsAsErrors=true
 
 # JavaScript/TypeScript linting
 js-lint: _ensure-npm
@@ -249,11 +277,17 @@ js-lint: _ensure-npm
     set -euo pipefail
     if [ -d "client" ]; then
         echo "Linting client..."
-        cd client && npm run lint && cd ..
+        (
+            cd client
+            npm run lint
+        )
     fi
     if [ -d "workers" ]; then
         echo "Linting workers..."
-        cd workers && npm run lint && cd ..
+        (
+            cd workers
+            npm run lint
+        )
     fi
 
 # All linting: code + documentation + configuration
@@ -289,7 +323,12 @@ python-lint: _ensure-uv
     # Only lint hpc_runner (Python still used for HPC processing)
     if [ -d "hpc_runner" ]; then
         echo "Linting hpc_runner..."
-        cd hpc_runner && uv run ruff check . --fix && uv run ruff format . && uv run mypy . && cd ..
+        (
+            cd hpc_runner
+            uv run ruff check . --fix
+            uv run ruff format .
+            uv run mypy .
+        )
     fi
 
 # Shell script linting
@@ -325,6 +364,7 @@ setup:
     echo ""
     
     # Check for required tools
+    missing_required=0
     for tool in dotnet node npm docker shellcheck shfmt uv; do
         if command -v "$tool" &> /dev/null; then
             echo "  ✓ $tool installed"
@@ -332,16 +372,22 @@ setup:
             echo "  ✗ $tool NOT installed"
             case "$tool" in
                 dotnet)
+                    missing_required=1
                     echo "    Install: https://dotnet.microsoft.com/download"
                     echo "    macOS: brew install dotnet"
                     ;;
                 uv)
+                    missing_required=1
                     echo "    Install: https://github.com/astral-sh/uv"
                     echo "    macOS: brew install uv"
                     echo "    Linux/WSL: curl -LsSf https://astral.sh/uv/install.sh | sh"
                     ;;
-                node|npm) echo "    Install: https://nodejs.org" ;;
+                node|npm)
+                    missing_required=1
+                    echo "    Install: https://nodejs.org"
+                    ;;
                 docker)
+                    missing_required=1
                     echo "    Install: https://www.docker.com/get-started"
                     echo "    macOS: brew install --cask docker"
                     echo "    Linux: https://docs.docker.com/engine/install/"
@@ -352,6 +398,12 @@ setup:
             esac
         fi
     done
+    
+    if [ "$missing_required" -ne 0 ]; then
+        echo ""
+        echo "❌ One or more required tools are missing. Please install them before continuing."
+        exit 1
+    fi
     
     echo ""
     echo "Installing dependencies..."
@@ -365,19 +417,28 @@ setup:
     # HPC runner setup
     if [ -d "hpc_runner" ]; then
         echo "  Setting up hpc_runner..."
-        cd hpc_runner && uv sync && cd ..
+        (
+            cd hpc_runner
+            uv sync
+        )
     fi
     
     # Client setup
     if [ -d "client" ]; then
         echo "  Setting up client..."
-        cd client && npm install && cd ..
+        (
+            cd client
+            npm install
+        )
     fi
     
     # Workers setup
     if [ -d "workers" ]; then
         echo "  Setting up workers..."
-        cd workers && npm install && cd ..
+        (
+            cd workers
+            npm install
+        )
     fi
     
     echo ""
@@ -422,36 +483,40 @@ test-coverage: test-dotnet-coverage test-python-coverage test-js-coverage
 test-dotnet: _ensure-dotnet
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -f "app.sln" ]; then
-        echo "Testing .NET projects..."
-        dotnet test app.sln
+    if [ ! -f "app.sln" ]; then
+        echo "❌ app.sln not found; expected for .NET tests" >&2
+        exit 1
     fi
+    echo "Testing .NET projects..."
+    dotnet test app.sln
 
 # .NET tests with coverage
 test-dotnet-coverage: _ensure-dotnet
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -f "app.sln" ]; then
-        echo "Testing .NET projects with coverage..."
-        dotnet test app.sln --collect:"XPlat Code Coverage" --results-directory ./coverage
+    if [ ! -f "app.sln" ]; then
+        echo "❌ app.sln not found; expected for .NET tests" >&2
+        exit 1
+    fi
+    echo "Testing .NET projects with coverage..."
+    dotnet test app.sln --collect:"XPlat Code Coverage" --results-directory ./coverage
+    echo ""
+    # Add .NET tools to PATH
+    export PATH="$PATH:$HOME/.dotnet/tools"
+    # Install reportgenerator if not available
+    if ! command -v reportgenerator &> /dev/null; then
+        echo "Installing reportgenerator..."
+        dotnet tool install -g dotnet-reportgenerator-globaltool || true
+    fi
+    # Generate text summary for terminal output
+    if command -v reportgenerator &> /dev/null; then
         echo ""
-        # Add .NET tools to PATH
-        export PATH="$PATH:$HOME/.dotnet/tools"
-        # Install reportgenerator if not available
-        if ! command -v reportgenerator &> /dev/null; then
-            echo "Installing reportgenerator..."
-            dotnet tool install -g dotnet-reportgenerator-globaltool || true
-        fi
-        # Generate text summary for terminal output
-        if command -v reportgenerator &> /dev/null; then
-            echo ""
-            echo "Coverage Summary:"
-            reportgenerator -reports:./coverage/**/coverage.cobertura.xml -targetdir:./coverage -reporttypes:TextSummary > /dev/null 2>&1
-            cat ./coverage/Summary.txt
-        else
-            echo "Coverage report generated in ./coverage directory"
-            echo "Install reportgenerator for terminal summary: dotnet tool install -g dotnet-reportgenerator-globaltool"
-        fi
+        echo "Coverage Summary:"
+        reportgenerator -reports:./coverage/**/coverage.cobertura.xml -targetdir:./coverage -reporttypes:TextSummary > /dev/null 2>&1
+        cat ./coverage/Summary.txt
+    else
+        echo "Coverage report generated in ./coverage directory"
+        echo "Install reportgenerator for terminal summary: dotnet tool install -g dotnet-reportgenerator-globaltool"
     fi
 
 # JavaScript tests
@@ -460,11 +525,17 @@ test-js: _ensure-npm
     set -euo pipefail
     if [ -d "client" ] && [ -f "client/package.json" ]; then
         echo "Testing client..."
-        cd client && npm test && cd ..
+        (
+            cd client
+            npm test
+        )
     fi
     if [ -d "workers" ] && [ -f "workers/package.json" ]; then
         echo "Testing workers..."
-        cd workers && npm test && cd ..
+        (
+            cd workers
+            npm test
+        )
     fi
 
 # JavaScript tests with coverage
@@ -473,11 +544,17 @@ test-js-coverage: _ensure-npm
     set -euo pipefail
     if [ -d "client" ] && [ -f "client/package.json" ]; then
         echo "Testing client with coverage..."
-        cd client && npm run test:coverage && cd ..
+        (
+            cd client
+            npm run test:coverage
+        )
     fi
     if [ -d "workers" ] && [ -f "workers/package.json" ]; then
         echo "Testing workers with coverage..."
-        cd workers && npm run test:coverage && cd ..
+        (
+            cd workers
+            npm run test:coverage
+        )
     fi
 
 # Python tests
@@ -486,7 +563,10 @@ test-python: _ensure-uv
     set -euo pipefail
     if [ -d "hpc_runner" ] && [ -f "hpc_runner/pyproject.toml" ]; then
         echo "Testing hpc_runner..."
-        cd hpc_runner && uv run pytest && cd ..
+        (
+            cd hpc_runner
+            uv run pytest
+        )
     fi
 
 # Python tests with coverage
@@ -495,7 +575,10 @@ test-python-coverage: _ensure-uv
     set -euo pipefail
     if [ -d "hpc_runner" ] && [ -f "hpc_runner/pyproject.toml" ]; then
         echo "Testing hpc_runner with coverage..."
-        cd hpc_runner && uv run pytest --cov=. --cov-report=html --cov-report=term && cd ..
+        (
+            cd hpc_runner
+            uv run pytest --cov=. --cov-report=html --cov-report=term
+        )
     fi
 
 # Type checking
@@ -504,11 +587,17 @@ typecheck: _ensure-npm
     set -euo pipefail
     if [ -d "client" ]; then
         echo "Type checking client..."
-        cd client && npx tsc --noEmit && cd ..
+        (
+            cd client
+            npx tsc --noEmit
+        )
     fi
     if [ -d "workers" ]; then
         echo "Type checking workers..."
-        cd workers && npx tsc --noEmit && cd ..
+        (
+            cd workers
+            npx tsc --noEmit
+        )
     fi
 
 # Validate YAML files

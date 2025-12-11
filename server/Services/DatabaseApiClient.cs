@@ -22,28 +22,10 @@ public class DatabaseApiClient : IDatabaseApiClient
     private readonly HttpClient _httpClient;
     private readonly ILogger<DatabaseApiClient> _logger;
 
-    public DatabaseApiClient(HttpClient httpClient, IConfiguration configuration, ILogger<DatabaseApiClient> logger)
+    public DatabaseApiClient(HttpClient httpClient, ILogger<DatabaseApiClient> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
-        
-        var baseUrl = configuration["DB_API_URL"] 
-                      ?? configuration["DatabaseApi:BaseUrl"] 
-                      ?? "http://localhost:8787";
-        
-        var token = configuration["DB_API_TOKEN"] 
-                    ?? configuration["DatabaseApi:Token"] 
-                    ?? string.Empty;
-
-        _httpClient.BaseAddress = new Uri(baseUrl.TrimEnd('/'));
-        
-        // Only set authorization if token is provided
-        if (!string.IsNullOrEmpty(token))
-        {
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        }
-        
-        _httpClient.Timeout = TimeSpan.FromSeconds(30);
     }
 
     public async Task<Job> GetJobAsync(Guid jobId, CancellationToken cancellationToken = default)
@@ -166,7 +148,7 @@ public class DatabaseApiClient : IDatabaseApiClient
                 SlurmId = data.TryGetValue("slurm_id", out var slurmIdElement) && slurmIdElement.ValueKind != JsonValueKind.Null 
                     ? slurmIdElement.GetString() 
                     : null,
-                Status = Enum.Parse<JobStatus>(statusElement.GetString() ?? "Submitted", ignoreCase: true),
+                Status = Enum.Parse<JobStatus>(statusElement.GetString() ?? throw new InvalidOperationException("Job status cannot be null"), ignoreCase: true),
                 R2Key = r2KeyElement.GetString() ?? throw new InvalidOperationException("r2_key cannot be null"),
                 CreatedAt = data.TryGetValue("created_at", out var createdAtElement) && createdAtElement.ValueKind != JsonValueKind.Null
                     ? DateTimeOffset.FromUnixTimeSeconds(createdAtElement.GetInt64()).UtcDateTime
@@ -178,7 +160,7 @@ public class DatabaseApiClient : IDatabaseApiClient
                     ? resultsUrlElement.GetString()
                     : null,
                 UserId = data.TryGetValue("user_id", out var userIdElement) && userIdElement.ValueKind != JsonValueKind.Null
-                    ? Guid.Parse(userIdElement.GetString()!)
+                    ? Guid.Parse(userIdElement.GetString() ?? throw new InvalidOperationException("user_id cannot be null"))
                     : null,
                 Error = null
             };

@@ -72,8 +72,8 @@ cd workers && npm test
 tests/
 └── server.tests/
     ├── server.tests.csproj       # xUnit project file
+    ├── DomainModelTests.cs       # Domain model serialization tests
     ├── JobControllerTests.cs     # Controller tests
-    ├── DatabaseApiClientTests.cs # Database client tests
     └── MetricsClientTests.cs     # Metrics client tests
 ```
 
@@ -282,19 +282,19 @@ dotnet test --logger "console;verbosity=detailed"
 
 ```bash
 # Run specific test
-uv run pytest tests/test_runner.py::test_function
+cd hpc_runner && uv run pytest tests/test_runner.py::test_function
 
 # Verbose output
-uv run pytest -v
+cd hpc_runner && uv run pytest -v
 
 # Show print statements
-uv run pytest -s
+cd hpc_runner && uv run pytest -s
 
 # Stop on first failure
-uv run pytest -x
+cd hpc_runner && uv run pytest -x
 
 # Interactive debugging
-uv run pytest --pdb
+cd hpc_runner && uv run pytest --pdb
 ```
 
 ### JavaScript/TypeScript
