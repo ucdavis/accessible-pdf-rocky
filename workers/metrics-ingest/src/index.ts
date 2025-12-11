@@ -26,14 +26,14 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 interface MetricPayload {
-	source: string; // "hpc" or "server"
+	source: 'hpc' | 'server';
 	timestamp: number; // Unix timestamp (seconds)
 	metrics: Record<string, number>;
 }
 
 interface MetricRow {
 	id: number;
-	source: string;
+	source: 'hpc' | 'server';
 	timestamp: number;
 	metric_name: string;
 	metric_value: number;
