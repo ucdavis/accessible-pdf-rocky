@@ -55,7 +55,7 @@ interface ProcessingMetric {
 	created_at: number;
 }
 
-export default {
+	export default {
 	async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
 		const url = new URL(request.url);
 
@@ -69,6 +69,13 @@ export default {
 
 		if (request.method === 'OPTIONS') {
 			return new Response(null, { headers: corsHeaders });
+		}
+
+		// Health check endpoint (unauthenticated for Docker healthcheck)
+		if (url.pathname === '/health' && (request.method === 'GET' || request.method === 'HEAD')) {
+			return new Response(JSON.stringify({ status: 'healthy' }), {
+				headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+			});
 		}
 
 		// Authentication (using timing-safe comparison)

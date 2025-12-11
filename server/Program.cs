@@ -85,6 +85,9 @@ app.UseHttpsRedirection();
 app.UseCors("AllowClient");
 app.MapControllers();
 
+// Health check endpoint
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+
 // Minimal error endpoint for production exception handling
 app.Map("/error", () => Results.Problem(
     title: "An error occurred",

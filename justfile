@@ -84,7 +84,10 @@ audit: _ensure-npm _ensure-uv
         echo "Auditing hpc_runner Python packages..."
         (
             cd hpc_runner
-            uv pip install --quiet pip-audit
+            # Install pip-audit once if not already available
+            if ! uv run pip-audit --version >/dev/null 2>&1; then
+                uv pip install --quiet pip-audit
+            fi
             uv run pip-audit || true
         )
         echo ""
@@ -92,11 +95,11 @@ audit: _ensure-npm _ensure-uv
     
     echo "✅ Security audit complete!"
 
-# Update all dependencies to their latest versions
+# Update JS/Python dependencies and restore .NET packages
 update: _ensure-npm _ensure-uv _ensure-dotnet
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "Updating all dependencies..."
+    echo "Updating JS/Python dependencies and restoring .NET packages..."
     echo ""
     
     # Restore .NET packages (does not update versions)
@@ -140,7 +143,10 @@ update: _ensure-npm _ensure-uv _ensure-dotnet
         echo ""
     fi
     
-    echo "✅ All dependencies updated!"
+    echo "✅ JS/Python dependencies updated and .NET packages restored."
+    echo "   To upgrade NuGet package versions, run:"
+    echo "     dotnet tool install -g dotnet-outdated-tool"
+    echo "     dotnet outdated -u"
 
 # Build all projects
 build: _ensure-npm _ensure-dotnet
@@ -187,6 +193,7 @@ clean:
     [ -d "client/node_modules" ] && rm -rf client/node_modules
     [ -d "client/dist" ] && rm -rf client/dist
     [ -d "workers/node_modules" ] && rm -rf workers/node_modules
+    [ -d "workers/dist" ] && rm -rf workers/dist
     # Python artifacts
     [ -d "hpc_runner/.venv" ] && rm -rf hpc_runner/.venv
     find hpc_runner -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
@@ -241,6 +248,7 @@ help:
     @echo "  just lint-code     # Code linting (.NET, Python, JavaScript, Shell)"
     @echo "  just lint-docs     # Documentation linting (Markdown, Spelling)"
     @echo "  just lint-config   # Configuration validation (JSON, YAML, Actions)"
+    @echo "  just typecheck     # Type checking (TypeScript)"
     @echo ""
     @echo "Security:"
     @echo "  just audit         # Check for vulnerabilities in dependencies"
@@ -514,7 +522,9 @@ test-dotnet-coverage: _ensure-dotnet
     if command -v reportgenerator &> /dev/null; then
         echo ""
         echo "Coverage Summary:"
-        reportgenerator -reports:./coverage/**/coverage.cobertura.xml -targetdir:./coverage -reporttypes:TextSummary > /dev/null 2>&1
+        reportgenerator "-reports:./coverage/**/coverage.cobertura.xml" \
+                        -targetdir:./coverage \
+                        -reporttypes:TextSummary > /dev/null 2>&1
         cat ./coverage/Summary.txt
     else
         echo "Coverage report generated in ./coverage directory"

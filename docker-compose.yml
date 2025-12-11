@@ -9,7 +9,12 @@ services:
     volumes:
       - ./workers/db-api:/app
       - db-api-node-modules:/app/node_modules
-    command: sh -c "test -d node_modules || npm install && npx wrangler dev --port 8787 --ip *******"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8787/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: sh -c "test -d node_modules || npm install && npx wrangler dev src/index.ts --port 8787 --ip 0.0.0.0"
 
   # .NET Server
   server:
@@ -31,8 +36,14 @@ services:
     volumes:
       - ./server:/app/server
       - ./server.core:/app/server.core
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5165/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
-      - db-api
+      db-api:
+        condition: service_healthy
     command: dotnet watch --project /app/server/server.csproj
 
   # React/Vite Client
@@ -43,13 +54,19 @@ services:
     ports:
       - "5173:5173"
     environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:5165}
+      VITE_API_URL: ${VITE_API_URL:-http://server:5165}
     volumes:
       - ./client:/app
       - client-node-modules:/app/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5173 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
-      - server
-    command: sh -c "test -d node_modules || npm install && npm run dev -- --host *******"
+      server:
+        condition: service_healthy
+    command: sh -c "test -d node_modules || npm install && npm run dev -- --host 0.0.0.0"
 
 volumes:
   db-api-node-modules:
