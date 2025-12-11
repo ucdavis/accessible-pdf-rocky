@@ -73,8 +73,22 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+else
+{
+    // Global exception handler for production
+    app.UseExceptionHandler("/error");
+}
+
+// Ensure HTTPS in production
+app.UseHttpsRedirection();
 
 app.UseCors("AllowClient");
 app.MapControllers();
+
+// Minimal error endpoint for production exception handling
+app.Map("/error", () => Results.Problem(
+    title: "An error occurred",
+    statusCode: StatusCodes.Status500InternalServerError
+));
 
 app.Run();

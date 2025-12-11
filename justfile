@@ -99,8 +99,10 @@ update: _ensure-npm _ensure-uv _ensure-dotnet
     echo "Updating all dependencies..."
     echo ""
     
-    # Restore .NET packages (note: dotnet restore doesn't bump versions)
-    # To update NuGet packages, use: dotnet add package <PackageName> or dotnet-outdated tool
+    # Restore .NET packages (does not update versions)
+    # To update NuGet packages to latest, install and run:
+    #   dotnet tool install -g dotnet-outdated-tool
+    #   dotnet outdated -u
     if [ -d "server" ]; then
         echo "Restoring .NET packages..."
         dotnet restore
