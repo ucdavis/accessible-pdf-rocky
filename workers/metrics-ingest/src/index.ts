@@ -1,7 +1,7 @@
 /**
  * Metrics Ingestion Worker
  *
- * Receives metrics from HPC and FastAPI controller, stores in D1,
+ * Receives metrics from HPC and .NET server, stores in D1,
  * and exposes Prometheus-compatible endpoint for monitoring.
  */
 
@@ -26,7 +26,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 interface MetricPayload {
-	source: string; // "hpc" or "fastapi"
+	source: string; // "hpc" or "server"
 	timestamp: number; // Unix timestamp (seconds)
 	metrics: Record<string, number>;
 }
@@ -57,7 +57,7 @@ export default {
 		}
 
 		try {
-			// POST /ingest - receive metrics from HPC/FastAPI
+			// POST /ingest - receive metrics from HPC/.NET server
 			if (url.pathname === '/ingest' && request.method === 'POST') {
 				return await handleIngest(request, env, corsHeaders);
 			}

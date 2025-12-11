@@ -154,7 +154,7 @@ scrape_configs:
   # Optional: Node Exporter on .NET server/HPC for system metrics
   - job_name: 'node'
     static_configs:
-      - targets: ['fastapi.internal:9100', 'hpc-login.ucdavis.edu:9100']
+      - targets: ['server.internal:9100', 'hpc-login.ucdavis.edu:9100']
 ```
 
 ### Start Prometheus
@@ -362,7 +362,7 @@ promtool check rules alerts.yml
 
 ```bash
 # Check if /metrics endpoint works
-curl http://fastapi.internal:8000/metrics
+curl http://server.internal:5165/health
 
 # Check Prometheus targets
 curl http://localhost:9090/api/v1/targets | jq '.data.activeTargets'

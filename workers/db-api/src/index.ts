@@ -2,7 +2,7 @@
  * Database API Worker
  *
  * Provides REST API for D1 database operations.
- * FastAPI controller calls this worker for all database interactions.
+ * The .NET server calls this worker for all database interactions.
  */
 
 export interface Env {

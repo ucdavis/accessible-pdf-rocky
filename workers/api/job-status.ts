@@ -1,17 +1,17 @@
 /**
  * Job Status Worker
  * 
- * Proxy requests to FastAPI controller for job status.
+ * Proxy requests to .NET server for job status.
  * 
  * TODO: Implement job status endpoint
  * - Extract job ID from URL or query params
- * - Proxy request to FastAPI controller
+ * - Proxy request to .NET server
  * - Return job status, results URL, error messages
  * - Cache responses for completed jobs
  */
 
 export interface Env {
-  FASTAPI_URL: string;
+  SERVER_URL: string;
 }
 
 export default {
@@ -29,8 +29,8 @@ export default {
     //   return new Response("Missing jobId", { status: 400 });
     // }
     //
-    // // Proxy to FastAPI controller
-    // const res = await fetch(`${env.FASTAPI_URL}/status/${jobId}`);
+    // // Proxy to .NET server
+    // const res = await fetch(`${env.SERVER_URL}/status/${jobId}`);
     // return res;
 
     return new Response("Not implemented", { status: 501 });

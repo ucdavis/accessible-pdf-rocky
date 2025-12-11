@@ -1,6 +1,6 @@
 # Metrics Ingestion Worker
 
-Cloudflare Worker that receives metrics from HPC and FastAPI, stores them in D1, and exposes a Prometheus-compatible endpoint.
+Cloudflare Worker that receives metrics from HPC and the .NET server, stores them in D1, and exposes a Prometheus-compatible endpoint.
 
 ## Quick Start
 
@@ -29,7 +29,7 @@ npm run deploy
 
 ### `POST /ingest`
 
-Receive metrics from sources (HPC, FastAPI).
+Receive metrics from sources (HPC, .NET server).
 
 **Authentication:** Bearer token required
 
@@ -79,7 +79,7 @@ JSON API for custom dashboards.
 
 **Query Parameters:**
 
-- `source` (optional): Filter by source (hpc, fastapi)
+- `source` (optional): Filter by source (hpc, server)
 - `window` (optional): Time window (1m, 5m, 1h, 1d) - default 1h
 - `metric` (optional): Filter by metric name
 - `limit` (optional): Maximum rows to return (1-50000, default 10000)
@@ -104,7 +104,7 @@ List active metric sources.
 **Response:**
 
 ```json
-["hpc", "fastapi"]
+["hpc", "server"]
 ```
 
 ## Development
