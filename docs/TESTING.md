@@ -34,7 +34,7 @@ just test-dotnet
 just test-dotnet-coverage
 
 # Or manually
-cd tests && dotnet test
+dotnet test
 ```
 
 ### Python Tests
@@ -70,10 +70,11 @@ cd workers && npm test
 
 ```
 tests/
-├── tests.csproj               # xUnit project file
-├── JobControllerTests.cs      # Controller tests
-├── DatabaseApiClientTests.cs  # Database client tests
-└── MetricsClientTests.cs      # Metrics client tests
+└── server.tests/
+    ├── server.tests.csproj       # xUnit project file
+    ├── JobControllerTests.cs     # Controller tests
+    ├── DatabaseApiClientTests.cs # Database client tests
+    └── MetricsClientTests.cs     # Metrics client tests
 ```
 
 **Conventions:**
@@ -209,8 +210,8 @@ describe('Module', () => {
 
 ```bash
 # .NET
-cd tests && dotnet test --collect:"XPlat Code Coverage"
-# Coverage report in tests/TestResults/
+dotnet test --collect:"XPlat Code Coverage" --results-directory ./coverage
+# Coverage report in coverage/
 
 # Python (hpc_runner)
 cd hpc_runner && uv run pytest --cov=. --cov-report=html
@@ -231,7 +232,6 @@ Tests run automatically on:
 
 - Every push to `main`
 - Every pull request
-- Schedule (weekly)
 
 ### GitHub Actions
 
@@ -355,7 +355,7 @@ npm test -- -u
 
 - Clear cache: `npx vitest --clearCache`
 - Check `vitest.config.ts` and `vitest.setup.ts`
-- Verify Vite/Next.js compatibility
+- Verify Vite compatibility with dependencies
 
 ## Resources
 

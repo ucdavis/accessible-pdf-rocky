@@ -38,6 +38,12 @@ builder.Services.AddCors(options =>
                     .AllowAnyHeader()
                     .AllowAnyMethod();
             }
+            else
+            {
+                // Log warning if no CORS origins configured in non-development
+                Console.WriteLine("WARNING: No CORS allowed origins configured. Cross-origin requests will be blocked.");
+                Console.WriteLine("         Configure 'Cors:AllowedOrigins' in appsettings.Production.json or environment variables.");
+            }
         }
     });
 });

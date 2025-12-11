@@ -21,28 +21,26 @@ public class DatabaseApiClient : IDatabaseApiClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<DatabaseApiClient> _logger;
-    private readonly string _baseUrl;
-    private readonly string _token;
 
     public DatabaseApiClient(HttpClient httpClient, IConfiguration configuration, ILogger<DatabaseApiClient> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
         
-        _baseUrl = configuration["DB_API_URL"] 
-                   ?? configuration["DatabaseApi:BaseUrl"] 
-                   ?? "http://localhost:8787";
+        var baseUrl = configuration["DB_API_URL"] 
+                      ?? configuration["DatabaseApi:BaseUrl"] 
+                      ?? "http://localhost:8787";
         
-        _token = configuration["DB_API_TOKEN"] 
-                 ?? configuration["DatabaseApi:Token"] 
-                 ?? string.Empty;
+        var token = configuration["DB_API_TOKEN"] 
+                    ?? configuration["DatabaseApi:Token"] 
+                    ?? string.Empty;
 
-        _httpClient.BaseAddress = new Uri(_baseUrl.TrimEnd('/'));
+        _httpClient.BaseAddress = new Uri(baseUrl.TrimEnd('/'));
         
         // Only set authorization if token is provided
-        if (!string.IsNullOrEmpty(_token))
+        if (!string.IsNullOrEmpty(token))
         {
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
         
         _httpClient.Timeout = TimeSpan.FromSeconds(30);
@@ -66,7 +64,7 @@ public class DatabaseApiClient : IDatabaseApiClient
         {
             ["id"] = jobId.ToString(),
             ["r2_key"] = r2Key,
-            ["status"] = "submitted"
+            ["status"] = JobStatus.Submitted.ToString().ToLowerInvariant()
         };
 
         if (slurmId != null)
@@ -124,7 +122,7 @@ public class DatabaseApiClient : IDatabaseApiClient
         if (status.HasValue)
             queryParams.Add($"status={Uri.EscapeDataString(status.Value.ToString().ToLowerInvariant())}");
         if (userId.HasValue)
-            queryParams.Add($"user_id={Uri.EscapeDataString(userId.ToString()!)}");
+            queryParams.Add($"user_id={Uri.EscapeDataString(userId.Value.ToString())}");
 
         var query = string.Join("&", queryParams);
         var response = await _httpClient.GetAsync($"/jobs?{query}", cancellationToken);
@@ -169,7 +167,7 @@ public class DatabaseApiClient : IDatabaseApiClient
                     ? slurmIdElement.GetString() 
                     : null,
                 Status = Enum.Parse<JobStatus>(statusElement.GetString() ?? "Submitted", ignoreCase: true),
-                R2Key = r2KeyElement.GetString() ?? string.Empty,
+                R2Key = r2KeyElement.GetString() ?? throw new InvalidOperationException("r2_key cannot be null"),
                 CreatedAt = data.TryGetValue("created_at", out var createdAtElement) && createdAtElement.ValueKind != JsonValueKind.Null
                     ? DateTimeOffset.FromUnixTimeSeconds(createdAtElement.GetInt64()).UtcDateTime
                     : now,

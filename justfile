@@ -27,10 +27,11 @@ _ensure-dotnet:
     #!/usr/bin/env bash
     set -euo pipefail
     command -v dotnet >/dev/null || { echo "❌ 'dotnet' not found. Install from https://dotnet.microsoft.com/download"; exit 1; }
-    # Check for .NET 8
-    if ! dotnet --version | grep -q "^8\."; then
-        echo "⚠️  .NET 8 required but $(dotnet --version) found"
-        echo "   Install .NET 8 from https://dotnet.microsoft.com/download"
+    # Check for .NET 8 or higher
+    version=$(dotnet --version | cut -d. -f1)
+    if [ "$version" -lt 8 ]; then
+        echo "⚠️  .NET 8+ required but $(dotnet --version) found"
+        echo "   Install .NET 8 or later from https://dotnet.microsoft.com/download"
         exit 1
     fi
 
@@ -421,18 +422,18 @@ test-coverage: test-dotnet-coverage test-python-coverage test-js-coverage
 test-dotnet: _ensure-dotnet
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -d "server" ]; then
+    if [ -f "app.sln" ]; then
         echo "Testing .NET projects..."
-        dotnet test
+        dotnet test app.sln
     fi
 
 # .NET tests with coverage
 test-dotnet-coverage: _ensure-dotnet
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -d "server" ]; then
+    if [ -f "app.sln" ]; then
         echo "Testing .NET projects with coverage..."
-        dotnet test --collect:"XPlat Code Coverage" --results-directory ./coverage
+        dotnet test app.sln --collect:"XPlat Code Coverage" --results-directory ./coverage
         echo ""
         # Add .NET tools to PATH
         export PATH="$PATH:$HOME/.dotnet/tools"
