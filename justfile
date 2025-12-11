@@ -245,7 +245,7 @@ help:
     @echo ""
     @echo "Quality Check Groups:"
     @echo "  just lint          # All linting (code + docs + config)"
-    @echo "  just lint-code     # Code linting (.NET, Python, JavaScript, Shell)"
+    @echo "  just lint-code     # Code linting (.NET, Python, JavaScript, TypeScript, Shell)"
     @echo "  just lint-docs     # Documentation linting (Markdown, Spelling)"
     @echo "  just lint-config   # Configuration validation (JSON, YAML, Actions)"
     @echo "  just typecheck     # Type checking (TypeScript)"
@@ -303,8 +303,8 @@ js-lint: _ensure-npm
 # All linting: code + documentation + configuration
 lint: lint-code lint-docs lint-config
 
-# Code linting: .NET + Python + JavaScript + Shell
-lint-code: dotnet-lint python-lint js-lint shell-lint
+# Code linting + type checking: .NET + Python + JavaScript + TypeScript + Shell
+lint-code: dotnet-lint python-lint js-lint typecheck shell-lint
 
 # Configuration validation: JSON, YAML, GitHub Actions workflows
 lint-config: validate-json validate-yaml action-lint

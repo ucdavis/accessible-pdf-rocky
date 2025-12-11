@@ -14,7 +14,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    command: sh -c "test -d node_modules || npm install && npx wrangler dev src/index.ts --port 8787 --ip 0.0.0.0"
+    command: sh /app/docker-init.sh
 
   # .NET Server
   server:
@@ -66,7 +66,7 @@ services:
     depends_on:
       server:
         condition: service_healthy
-    command: sh -c "test -d node_modules || npm install && npm run dev -- --host 0.0.0.0"
+    command: sh /app/docker-init.sh
 
 volumes:
   db-api-node-modules:

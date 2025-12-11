@@ -62,11 +62,13 @@ just help
 For a consistent development environment, use the provided Dev Container configuration:
 
 **VS Code:**
+
 1. Install the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
 2. Open this project in VS Code
 3. Click "Reopen in Container" when prompted
 
 **GitHub Codespaces:**
+
 1. Click the green "Code" button on GitHub
 2. Select the "Codespaces" tab
 3. Click "Create codespace on [branch]"

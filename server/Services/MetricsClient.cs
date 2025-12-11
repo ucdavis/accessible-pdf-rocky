@@ -37,7 +37,7 @@ public class MetricsClient : IMetricsClient
                  ?? configuration["Metrics:Token"]
                  ?? string.Empty;
 
-        _source = configuration["Metrics:Source"] ?? "dotnet-server";
+        _source = configuration["Metrics:Source"] ?? "server";
 
         _httpClient.Timeout = TimeSpan.FromSeconds(5);
 

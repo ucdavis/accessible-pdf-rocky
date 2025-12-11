@@ -108,6 +108,7 @@ If you see errors like "workerd on another platform than the one you're currentl
 **Cause:** Host `node_modules` (macOS/Windows) conflicting with Linux container binaries.
 
 **Solution:**
+
 ```bash
 # Stop and remove all devcontainer volumes
 docker compose -f .devcontainer/docker-compose.yml down -v
@@ -125,6 +126,7 @@ The devcontainer uses Docker volumes to isolate `node_modules` from the host, so
 **VS Code users:** Node.js, .NET, and Python are installed by VS Code when it connects (via "features"). If tools are missing after connecting, try rebuilding.
 
 **Manual testing:** To test the container without VS Code:
+
 ```bash
 # Start the services
 docker compose -f .devcontainer/docker-compose.yml up -d

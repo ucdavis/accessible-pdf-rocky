@@ -1,6 +1,6 @@
 # Database API Worker
 
-Cloudflare Worker that provides a REST API for D1 database operations. The FastAPI controller calls this worker for all database interactions.
+Cloudflare Worker that provides a REST API for D1 database operations. The .NET server calls this worker for all database interactions.
 
 ## Setup
 
@@ -35,7 +35,7 @@ npx wrangler secret put DB_AUTH_TOKEN
 # Paste the token when prompted
 ```
 
-Save this token - you'll need to set it as `DB_API_TOKEN` in the FastAPI controller environment.
+Save this token - you'll need to set it as `DB_API_TOKEN` in the .NET server environment.
 
 ### 5. Deploy
 
@@ -129,8 +129,8 @@ See `schema.sql` for the complete database schema. Tables:
 - **Authentication**: All endpoints require Bearer token authentication
 - **Token Storage**: Token is stored as a Cloudflare Workers secret
 - **CORS**: Configurable via `ALLOWED_ORIGIN` environment variable (defaults to `*` for development)
-  - Set `ALLOWED_ORIGIN` in production to restrict to your controller's domain
-  - Example: `ALLOWED_ORIGIN = "https://controller.example.com"`
+  - Set `ALLOWED_ORIGIN` in production to restrict to your server's domain
+  - Example: `ALLOWED_ORIGIN = "https://server.example.com"`
 - **Referential Integrity**: Foreign key validation ensures metrics reference existing jobs
 - **Database Security**: D1 database is not directly accessible from the internet
 
@@ -140,5 +140,5 @@ In `wrangler.toml`:
 
 ```toml
 [vars]
-ALLOWED_ORIGIN = "https://your-controller-domain.com"
+ALLOWED_ORIGIN = "https://your-server-domain.com"
 ```

@@ -26,7 +26,7 @@ public class MetricsClientTests
         {
             ["METRICS_ENDPOINT"] = "http://localhost:8788/ingest",
             ["METRICS_TOKEN"] = "test-token",
-            ["Metrics:Source"] = "test-source"
+            ["Metrics:Source"] = "server"
         };
         _configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(config)

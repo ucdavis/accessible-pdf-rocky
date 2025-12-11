@@ -7,47 +7,47 @@ echo "🔧 Running post-create setup..."
 bash .devcontainer/wait-for-db-api.sh
 
 # Install uv if not already available (backup in case Dockerfile install failed)
-if ! command -v uv &> /dev/null; then
-    echo "📦 Installing uv..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="$HOME/.cargo/bin:$PATH"
+if ! command -v uv &>/dev/null; then
+	echo "📦 Installing uv..."
+	curl -LsSf https://astral.sh/uv/install.sh | sh
+	export PATH="$HOME/.cargo/bin:$PATH"
 fi
 
 # Restore .NET packages
 if [ -f "app.sln" ]; then
-    echo "📦 Restoring .NET packages..."
-    dotnet restore
+	echo "📦 Restoring .NET packages..."
+	dotnet restore
 fi
 
 # Clean host node_modules and Python venv to prevent platform conflicts
 echo "🧹 Cleaning host node_modules and Python venv..."
 for dir in client workers; do
-    if [ -d "$dir/node_modules" ]; then
-        rm -rf "$dir/node_modules"
-    fi
+	if [ -d "$dir/node_modules" ]; then
+		rm -rf "$dir/node_modules"
+	fi
 done
 
 # Clean Python virtual environment if it exists
 if [ -d "hpc_runner/.venv" ]; then
-    rm -rf "hpc_runner/.venv"
+	rm -rf "hpc_runner/.venv"
 fi
 
 # Install client dependencies
 if [ -d "client" ]; then
-    echo "📦 Installing client dependencies..."
-    (cd client && npm install)
+	echo "📦 Installing client dependencies..."
+	(cd client && npm install)
 fi
 
 # Install workers dependencies
 if [ -d "workers" ]; then
-    echo "📦 Installing workers dependencies..."
-    (cd workers && npm install)
+	echo "📦 Installing workers dependencies..."
+	(cd workers && npm install)
 fi
 
 # Setup Python environment for HPC runner
 if [ -d "hpc_runner" ]; then
-    echo "📦 Setting up hpc_runner Python environment..."
-    (cd hpc_runner && uv sync)
+	echo "📦 Setting up hpc_runner Python environment..."
+	(cd hpc_runner && uv sync)
 fi
 
 echo "✅ Dev container setup complete."
