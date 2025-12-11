@@ -6,7 +6,7 @@ This document describes the Prometheus observability stack for the accessible PD
 
 We monitor three layers:
 
-1. **FastAPI Controller** — Job submission, R2 URLs, queue depth
+1. **.NET API Controller** — Job submission, R2 URLs, queue depth
 2. **HPC SLURM** — Job states, node availability, queue backlog
 3. **Infrastructure** — System resources via Node Exporter
 
@@ -17,7 +17,7 @@ flowchart TD
     Prometheus["Prometheus + Grafana<br/>Scrapes every 15-60s"] -->|/metrics| MetricsWorker
     Prometheus -->|:9100| NodeExporter
     
-    FastAPI["FastAPI Controller<br/>Pushes metrics"] -->|HTTPS POST| MetricsWorker
+    .NET API[".NET API Controller<br/>Pushes metrics"] -->|HTTPS POST| MetricsWorker
     HPC["HPC SLURM Export<br/>Pushes metrics"] -->|HTTPS POST| MetricsWorker
     
     MetricsWorker["Cloudflare Worker<br/>metrics-ingest<br/>• Stores in D1<br/>• Exposes /metrics endpoint"]
@@ -25,17 +25,17 @@ flowchart TD
     NodeExporter["Node Exporter<br/>:9100<br/>• System resources<br/>• CPU/Memory/Disk<br/>• Network stats"]
     
     style Prometheus fill:#ffeb99,stroke:#cc9900,stroke-width:3px,color:#000
-    style FastAPI fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
+    style .NET API fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
     style HPC fill:#ff9999,stroke:#cc0000,stroke-width:3px,color:#000
     style MetricsWorker fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
     style NodeExporter fill:#e6ccff,stroke:#9933ff,stroke-width:3px,color:#000
 ```
 
-## FastAPI Controller Metrics
+## .NET API Controller Metrics
 
 ### Architecture Note
 
-The FastAPI controller uses **push-based metrics** to a Cloudflare Worker instead of exposing a `/metrics` endpoint. This eliminates the need for inbound connections to the controller (important when behind HPC firewalls). See [Metrics Deployment](METRICS_DEPLOYMENT.md) for the full architecture.
+The .NET API .NET server uses **push-based metrics** to a Cloudflare Worker instead of exposing a `/metrics` endpoint. This eliminates the need for inbound connections to the .NET server (important when behind HPC firewalls). See [Metrics Deployment](METRICS_DEPLOYMENT.md) for the full architecture.
 
 ### Available Metrics
 
@@ -60,7 +60,7 @@ The FastAPI controller uses **push-based metrics** to a Cloudflare Worker instea
 Metrics are automatically pushed to the Cloudflare Worker endpoint when configured:
 
 ```bash
-# In controller/.env
+# In .NET server/.env
 METRICS_ENDPOINT=https://metrics.your-domain.workers.dev/ingest
 METRICS_TOKEN=your-secret-token
 ```
@@ -79,7 +79,7 @@ See [Metrics Deployment](METRICS_DEPLOYMENT.md) for setup instructions.
 
 ```bash
 # 1. Install SLURM metrics export script
-sudo cp controller/hpc/scripts/export_slurm_metrics.sh /usr/local/bin/
+sudo cp .NET server/hpc/scripts/export_slurm_metrics.sh /usr/local/bin/
 sudo chmod 755 /usr/local/bin/export_slurm_metrics.sh
 sudo chown root:root /usr/local/bin/export_slurm_metrics.sh
 
@@ -144,14 +144,14 @@ global:
   evaluation_interval: 30s
 
 scrape_configs:
-  # Cloudflare Worker (FastAPI + HPC metrics)
+  # Cloudflare Worker (.NET API + HPC metrics)
   - job_name: 'metrics-worker'
     static_configs:
       - targets: ['metrics.your-domain.workers.dev']
     metrics_path: '/metrics'
     scheme: https
 
-  # Optional: Node Exporter on controller/HPC for system metrics
+  # Optional: Node Exporter on .NET server/HPC for system metrics
   - job_name: 'node'
     static_configs:
       - targets: ['fastapi.internal:9100', 'hpc-login.ucdavis.edu:9100']
@@ -358,7 +358,7 @@ promtool check rules alerts.yml
 
 ## Troubleshooting
 
-### No metrics from FastAPI
+### No metrics from .NET API
 
 ```bash
 # Check if /metrics endpoint works

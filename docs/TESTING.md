@@ -6,9 +6,10 @@ This document describes the testing infrastructure and best practices for the pr
 
 The project uses a comprehensive testing strategy with:
 
-- **Python**: pytest with coverage tracking
-- **JavaScript/TypeScript**: Vitest for all frontend and worker tests
-- **CI/CD**: GitHub Actions for automated testing
+- **.NET**: xUnit with coverage tracking
+- **Python**: pytest for HPC runner tests
+- **JavaScript/TypeScript**: Vitest for client and worker tests
+- **CI/CD**: Azure Pipelines for automated testing
 - **Coverage**: Codecov integration for coverage reports
 
 ## Running Tests
@@ -23,17 +24,29 @@ just test
 just test-coverage
 ```
 
+### .NET Tests
+
+```bash
+# Run .NET tests only
+just test-dotnet
+
+# With coverage
+just test-dotnet-coverage
+
+# Or manually
+cd tests && dotnet test
+```
+
 ### Python Tests
 
 ```bash
-# Run Python tests only
+# Run Python tests only (hpc_runner)
 just test-python
 
 # With coverage
 just test-python-coverage
 
 # Or manually
-cd controller && uv run pytest
 cd hpc_runner && uv run pytest
 ```
 
@@ -47,25 +60,32 @@ just test-js
 just test-js-coverage
 
 # Or manually
-cd frontend && npm test
+cd client && npm test
 cd workers && npm test
 ```
 
 ## Test Structure
 
-### Python (controller & hpc_runner)
+### .NET (server & tests)
 
 ```
-controller/
-├── pyproject.toml             # pytest configuration
-└── tests/
-    ├── hpc/
-    │   └── test_submit.py     # SLURM submission tests
-    ├── services/
-    │   └── test_services.py   # Service layer tests
-    ├── test_db_r2.py          # Database and [R2](https://developers.cloudflare.com/r2/) integration tests
-    └── test_main.py           # FastAPI endpoint tests
+tests/
+├── tests.csproj               # xUnit project file
+├── JobControllerTests.cs      # Controller tests
+├── DatabaseApiClientTests.cs  # Database client tests
+└── MetricsClientTests.cs      # Metrics client tests
+```
 
+**Conventions:**
+
+- Test files: `*Tests.cs`
+- Test methods: `[Fact]` or `[Theory]` attributes
+- Use `xUnit` assertions
+- Use mocking libraries (Moq, NSubstitute)
+
+### Python (hpc_runner)
+
+```
 hpc_runner/
 ├── pyproject.toml             # pytest configuration
 └── tests/
@@ -80,24 +100,16 @@ hpc_runner/
 - Use fixtures for setup/teardown
 - Use `pytest.mark` for categorization
 
-### Frontend (Next.js + Vitest)
+### Client (React + Vite + Vitest)
 
 ```
-frontend/
+client/
 ├── src/
-│   ├── app/
+│   ├── routes/
 │   │   ├── __tests__/
-│   │   │   ├── layout.test.tsx     # Layout tests
-│   │   │   └── page.test.tsx       # Home page tests
-│   │   ├── jobs/
-│   │   │   ├── [id]/
-│   │   │   │   └── __tests__/
-│   │   │   │       └── page.test.tsx  # Job detail tests
-│   │   │   └── __tests__/
-│   │   │       └── page.test.tsx   # Jobs list tests
-│   │   └── upload/
-│   │       └── __tests__/
-│   │           └── page.test.tsx   # Upload page tests
+│   │   │   ├── index.test.tsx      # Home page tests
+│   │   │   ├── upload.test.tsx     # Upload page tests
+│   │   │   └── jobs.test.tsx       # Jobs routes tests
 │   ├── components/
 │   │   └── __tests__/
 │   │       └── components.test.tsx # Component tests
@@ -133,6 +145,28 @@ workers/
 - Test worker behavior in isolation
 
 ## Writing Tests
+
+### .NET Example
+
+```csharp
+using Xunit;
+
+public class ModuleTests
+{
+    [Fact]
+    public void TestFunction()
+    {
+        // Arrange
+        var expected = "value";
+        
+        // Act
+        var result = MyFunction();
+        
+        // Assert
+        Assert.Equal(expected, result);
+    }
+}
+```
 
 ### Python Example
 
@@ -174,16 +208,16 @@ describe('Module', () => {
 ### View Coverage Locally
 
 ```bash
-# Python (controller)
-cd controller && uv run pytest --cov=. --cov-report=html
-open htmlcov/index.html
+# .NET
+cd tests && dotnet test --collect:"XPlat Code Coverage"
+# Coverage report in tests/TestResults/
 
 # Python (hpc_runner)
 cd hpc_runner && uv run pytest --cov=. --cov-report=html
 open htmlcov/index.html
 
-# Frontend
-cd frontend && npm run test:coverage
+# Client
+cd client && npm run test:coverage
 open coverage/lcov-report/index.html
 
 # Workers
@@ -199,15 +233,15 @@ Tests run automatically on:
 - Every pull request
 - Schedule (weekly)
 
-### GitHub Actions Workflows
+### Azure Pipelines
 
-- `.github/workflows/ci.yml` - Main CI workflow (tests + linting)
-- `.github/workflows/codeql.yml` - Code security scanning
-- `.github/workflows/security.yml` - Security audits
+- `azure-pipelines.yml` - Main CI/CD pipeline (tests + linting + deployment)
+- Separate jobs for .NET, Python, and TypeScript tests
+- Parallel test execution for faster feedback
 
-### Workflow Status
+### Pipeline Status
 
-View test results: <https://github.com/ucdavis/accessible-pdf-rocky/actions>
+View test results in Azure DevOps portal
 
 ## Best Practices
 
@@ -230,11 +264,24 @@ View test results: <https://github.com/ucdavis/accessible-pdf-rocky/actions>
 
 ## Debugging Tests
 
+### .NET
+
+```bash
+# Run specific test
+dotnet test --filter "FullyQualifiedName=Namespace.ClassName.TestMethod"
+
+# Verbose output
+dotnet test -v detailed
+
+# Debug mode
+dotnet test --logger "console;verbosity=detailed"
+```
+
 ### Python
 
 ```bash
 # Run specific test
-uv run pytest tests/test_main.py::test_function
+uv run pytest tests/test_runner.py::test_function
 
 # Verbose output
 uv run pytest -v
@@ -264,12 +311,17 @@ npm test -- -u
 
 ## Test Dependencies
 
+### .NET Dependencies
+
+- `xunit` - Test framework
+- `xunit.runner.visualstudio` - Test runner
+- `Moq` or `NSubstitute` - Mocking libraries
+- `coverlet.collector` - Coverage collection
+
 ### Python Dependencies
 
 - `pytest` - Test framework
 - `pytest-cov` - Coverage plugin
-- `pytest-asyncio` - Async test support (controller only)
-- `httpx` - HTTP client for FastAPI tests
 
 ### JavaScript/TypeScript Dependencies
 
@@ -309,4 +361,4 @@ npm test -- -u
 - [pytest documentation](https://docs.pytest.org/)
 - [Vitest documentation](https://vitest.dev/)
 - [Testing Library](https://testing-library.com/)
-- [FastAPI testing](https://fastapi.tiangolo.com/tutorial/testing/)
+- [.NET testing](https://learn.microsoft.com/en-us/dotnet/core/testing/)

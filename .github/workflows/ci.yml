@@ -7,12 +7,54 @@ on:
     branches: ["main"]
 
 jobs:
+  lint-dotnet:
+    name: .NET Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build with warnings as errors
+        run: dotnet build /p:TreatWarningsAsErrors=true --no-restore
+
+  test-dotnet:
+    name: .NET Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Run tests
+        run: dotnet test --no-restore --verbosity normal /p:CollectCoverage=true /p:CoverletOutputFormat=lcov
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./tests/server.tests/coverage.info
+          flags: dotnet-server
+          fail_ci_if_error: false
+
   lint-python:
     name: Python Linting
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        directory: [controller, hpc_runner]
+        directory: [hpc_runner]
     steps:
       - uses: actions/checkout@v6
 
@@ -44,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        directory: [controller, hpc_runner]
+        directory: [hpc_runner]
     steps:
       - uses: actions/checkout@v6
 
@@ -71,8 +113,8 @@ jobs:
           flags: ${{ matrix.directory }}
           fail_ci_if_error: false
 
-  test-frontend:
-    name: Frontend Tests
+  test-client:
+    name: Client Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -82,22 +124,22 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: client/package-lock.json
 
       - name: Install dependencies
-        working-directory: ./frontend
+        working-directory: ./client
         run: npm ci
 
       - name: Run tests
-        working-directory: ./frontend
+        working-directory: ./client
         run: npm run test:coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./frontend/coverage/coverage-final.json
-          flags: frontend
+          files: ./client/coverage/coverage-final.json
+          flags: client
           fail_ci_if_error: false
 
   lint-workers:

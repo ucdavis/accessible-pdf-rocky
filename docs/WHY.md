@@ -167,7 +167,7 @@ Adobe does not allow:
 | **Custom fine-tuning** | ❌ Impossible | ✅ Train on your datasets |
 | **API-first automation** | ❌ Limited | ✅ Full microservices |
 | **PDF/UA tagging** | ❌ Partial | ✅ Deterministic builder |
-| **Cloud-neutral** | ❌ Adobe-only | ✅ Cloudflare + HPC + FastAPI |
+| **Cloud-neutral** | ❌ Adobe-only | ✅ Cloudflare + Azure + HPC |
 | **Local processing** | ❌ No | ✅ Yes (HPC/SLURM) |
 | **Reading order inference** | ❌ Heuristic-based | ✅ ML-based sequence prediction |
 | **Multi-column layouts** | ❌ Often fails | ✅ Spatial understanding |

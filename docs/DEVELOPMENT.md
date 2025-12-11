@@ -8,10 +8,10 @@ This guide explains how to set up and run the accessible-pdf-rocky system locall
 
 ```mermaid
 flowchart LR
-    A[User] --> B[Cloudflare Pages]
+    A[User] --> B[Cloudflare Pages<br/>React + Vite]
     B --> C[Workers]
     C --> D[R2 + Queues]
-    D --> E[FastAPI]
+    D --> E[.NET 8 API<br/>Azure]
     E --> F[SLURM/HPC]
     F --> G[R2]
     
@@ -27,8 +27,8 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    A[User] --> B[Next.js<br/>localhost:3000]
-    B --> C[FastAPI<br/>localhost:8000]
+    A[User] --> B[React + Vite<br/>localhost:5173]
+    B --> C[.NET 8 API<br/>localhost:5165]
     C --> D[Local FS]
     C --> E[D1 API Worker<br/>localhost:8787]
     
@@ -39,7 +39,7 @@ flowchart LR
 
 **Key differences:**
 
-- Frontend talks directly to FastAPI (no Workers layer)
+- Frontend talks directly to .NET API (no Workers layer)
 - Local filesystem instead of R2
 - Direct processing instead of Cloudflare Queues
 - No SLURM (runs ML locally or mocks it)
@@ -56,10 +56,11 @@ just dev
 
 This starts:
 
-- FastAPI controller on port 8000
-- Next.js frontend on port 3000
+- .NET 8 API server on port 5165
+- React + Vite client on port 5173
+- D1 API worker on port 8787
 
-**Note:** The D1 API worker is not included in docker-compose. You need to run it separately with `wrangler dev` (see Terminal 3 setup below). This is intentional - Wrangler's local dev server provides D1 emulation without Docker.
+**Note:** All services run in Docker for consistent local development.
 
 **Detached mode:**
 
@@ -72,8 +73,8 @@ just dev-down    # Stop everything
 **Restart a service:**
 
 ```bash
-just dev-restart frontend
-just dev-restart controller
+just dev-restart client
+just dev-restart server
 ```
 
 ### Option 2: Local Development (No Docker)
@@ -86,20 +87,20 @@ just setup  # Install all dependencies
 
 **Start services in separate terminals:**
 
-Terminal 1 - Frontend:
+Terminal 1 - Client:
 
 ```bash
-just dev-frontend
+just dev-client
 # or
-cd frontend && npm run dev
+cd client && npm run dev
 ```
 
-Terminal 2 - Controller:
+Terminal 2 - Server:
 
 ```bash
-just dev-controller
+just dev-server
 # or
-cd controller && uv run uvicorn main:app --reload
+cd server && dotnet watch run
 ```
 
 Terminal 3 - D1 API Worker:
@@ -124,42 +125,31 @@ npx wrangler dev --port 8788  # Start on port 8788 to avoid conflict with db-api
 
 ## Environment Configuration
 
-### Controller (.env)
+### Server (.env)
 
-Create `controller/.env`:
+Create `server/.env`:
 
 ```bash
-ENVIRONMENT=development
-DB_API_URL=http://localhost:8787
-DB_API_TOKEN=dev-token
-STORAGE_MODE=local
-STORAGE_PATH=./storage
-QUEUE_MODE=direct
-
-# Optional: Metrics collection (requires metrics-ingest worker on port 8788)
-METRICS_ENDPOINT=http://localhost:8788/ingest
-METRICS_TOKEN=dev-token
+ASPNETCORE_ENVIRONMENT=Development
+DatabaseApi__BaseUrl=http://localhost:8787
+DatabaseApi__Token=dev-token
+Metrics__Endpoint=http://localhost:8788/ingest
+Metrics__Token=dev-token
 ```
 
-**Modes:**
+**Configuration:**
 
-- `STORAGE_MODE=local` - Use filesystem instead of R2
-- `STORAGE_MODE=r2` - Use actual R2 (requires credentials)
-- `QUEUE_MODE=direct` - Process jobs immediately
-- `QUEUE_MODE=cloudflare` - Use Cloudflare Queues (requires credentials)
+- `DatabaseApi__BaseUrl` - URL for D1 API Worker
+- `DatabaseApi__Token` - Authentication token for D1 API
+- `Metrics__Endpoint` - URL for metrics collection (optional)
+- `Metrics__Token` - Authentication token for metrics
 
-**Metrics (Optional):**
+### Client (.env)
 
-- `METRICS_ENDPOINT` - URL for push-based metrics collection (see [Metrics Deployment](METRICS_DEPLOYMENT.md))
-- `METRICS_TOKEN` - Authentication token for metrics endpoint
-- If not configured, metrics collection is silently disabled
-
-### Frontend (.env.local)
-
-Create `frontend/.env.local`:
+Create `client/.env`:
 
 ```bash
-NEXT_PUBLIC_API_URL=http://localhost:8000
+VITE_API_URL=http://localhost:5165
 ```
 
 ## Testing Cloudflare Workers Locally
@@ -227,7 +217,7 @@ rm -rf workers/metrics-ingest/.wrangler/state/
 
 ### 1. Make Changes
 
-Edit code in `frontend/`, `controller/`, or `workers/`
+Edit code in `client/`, `server/`, or `workers/`
 
 ### 2. Lint and Format
 
@@ -258,42 +248,37 @@ just dev-logs
 Local:
 
 - Frontend: Check terminal
-- Controller: Check terminal or `controller/logs/`
+- Controller: Check terminal or `.NET server/logs/`
 
 ## API Development
 
-### Controller Endpoints
+### Server Endpoints
 
-[FastAPI](https://fastapi.tiangolo.com/) provides auto-generated docs:
+.NET Web API provides Swagger UI:
 
-- Swagger UI: <http://localhost:8000/docs>
-- ReDoc: <http://localhost:8000/redoc>
+- Swagger UI: <http://localhost:5165/swagger>
 
 ### Testing Endpoints
 
 ```bash
-# Upload PDF
-curl -X POST http://localhost:8000/api/upload \
-  -F "file=@test.pdf"
-
 # Check status
-curl http://localhost:8000/api/status/job-id-123
+curl http://localhost:5165/api/job/status/job-id-123
 ```
 
-## Frontend Development
+## Client Development
 
 ### Hot Reload
 
-Next.js automatically reloads on file changes.
+Vite automatically reloads on file changes.
 
 ### Component Development
 
 ```bash
-cd frontend
+cd client
 npm run dev
 ```
 
-Open <http://localhost:3000>
+Open <http://localhost:5173>
 
 ## Common Issues
 
@@ -302,8 +287,8 @@ Open <http://localhost:3000>
 If ports are in use:
 
 ```bash
-# Check what's using port 3000
-lsof -i :3000
+# Check what's using port 5173
+lsof -i :5173
 
 # Kill process
 kill -9 <PID>
@@ -313,7 +298,7 @@ Or change ports in `docker-compose.yml`:
 
 ```yaml
 ports:
-  - "3001:3000"  # External:Internal
+  - "5174:5173"  # External:Internal
 ```
 
 ### Database Connection Errors
@@ -330,12 +315,12 @@ curl http://localhost:8787/jobs \
 # Check Worker logs in terminal
 ```
 
-### Import Errors in Python
+### Build Errors in .NET
 
 ```bash
-# Resync dependencies
-cd controller
-uv sync
+# Restore dependencies
+cd server
+dotnet restore
 
 # Or rebuild Docker image
 just dev-down
@@ -346,7 +331,7 @@ just dev-up
 
 ```bash
 # Clear and reinstall
-cd frontend
+cd client
 rm -rf node_modules package-lock.json
 npm install
 
@@ -384,9 +369,9 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for production deployment.
 
 **Option 1: Local filesystem (current)**
 
-```python
-# controller uses local files
-STORAGE_MODE=local
+```bash
+# Server uses local files (configured in appsettings)
+Storage__Mode=local
 ```
 
 **Option 2: MinIO (S3-compatible)**
@@ -412,11 +397,11 @@ R2_SECRET_ACCESS_KEY=your-secret
 
 ### Cloudflare Queues
 
-**Option 1: Direct execution (current)**
+**Option 2: Direct execution (current)**
 
-```python
+```bash
 # Skip queue, call handler directly
-QUEUE_MODE=direct
+Queue__Mode=direct
 ```
 
 **Option 2: Redis queue**
@@ -461,6 +446,6 @@ npx wrangler deploy --env preview
 
 1. Set up `.env` files (see above)
 2. Run `just dev` to start everything
-3. Open <http://localhost:3000>
+3. Open <http://localhost:5173>
 4. Upload a test PDF
-5. Check API docs at <http://localhost:8000/docs>
+5. Check API docs at <http://localhost:5165/swagger>

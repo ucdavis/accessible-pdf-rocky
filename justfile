@@ -22,6 +22,18 @@ _ensure-uv:
     set -euo pipefail
     command -v uv >/dev/null || { echo "❌ 'uv' not found. See 'just setup' or https://github.com/astral-sh/uv"; exit 1; }
 
+# Internal helper: ensure dotnet is installed
+_ensure-dotnet:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    command -v dotnet >/dev/null || { echo "❌ 'dotnet' not found. Install from https://dotnet.microsoft.com/download"; exit 1; }
+    # Check for .NET 8
+    if ! dotnet --version | grep -q "^8\."; then
+        echo "⚠️  .NET 8 required but $(dotnet --version) found"
+        echo "   Install .NET 8 from https://dotnet.microsoft.com/download"
+        exit 1
+    fi
+
 # GitHub Actions workflow validation
 action-lint:
     #!/usr/bin/env bash
@@ -48,10 +60,10 @@ audit: _ensure-npm _ensure-uv
     echo "Running security audits..."
     echo ""
     
-    # NPM audit for frontend and workers
-    if [ -d "frontend" ]; then
-        echo "Auditing frontend npm packages..."
-        cd frontend && npm audit --audit-level=moderate || true && cd ..
+    # NPM audit for client and workers
+    if [ -d "client" ]; then
+        echo "Auditing client npm packages..."
+        cd client && npm audit --audit-level=moderate || true && cd ..
         echo ""
     fi
     if [ -d "workers" ]; then
@@ -60,12 +72,7 @@ audit: _ensure-npm _ensure-uv
         echo ""
     fi
     
-    # Python pip-audit for controller and hpc_runner
-    if [ -d "controller" ]; then
-        echo "Auditing controller Python packages..."
-        cd controller && uv pip install --quiet pip-audit && uv run pip-audit || true && cd ..
-        echo ""
-    fi
+    # Python pip-audit for hpc_runner
     if [ -d "hpc_runner" ]; then
         echo "Auditing hpc_runner Python packages..."
         cd hpc_runner && uv pip install --quiet pip-audit && uv run pip-audit || true && cd ..
@@ -74,14 +81,58 @@ audit: _ensure-npm _ensure-uv
     
     echo "✅ Security audit complete!"
 
-# Build all projects
-build: _ensure-npm _ensure-uv
+# Update all dependencies to their latest versions
+update: _ensure-npm _ensure-uv _ensure-dotnet
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -d "frontend" ]; then
-        echo "Building frontend..."
-        cd frontend && npm run build && cd ..
+    echo "Updating all dependencies..."
+    echo ""
+    
+    # Update .NET packages
+    if [ -d "server" ]; then
+        echo "Updating .NET packages..."
+        dotnet restore
+        echo ""
     fi
+    
+    # Update npm packages for client
+    if [ -d "client" ]; then
+        echo "Updating client npm packages..."
+        cd client && npm update && cd ..
+        echo ""
+    fi
+    
+    # Update npm packages for workers
+    if [ -d "workers" ]; then
+        echo "Updating workers npm packages..."
+        cd workers && npm update && cd ..
+        echo ""
+    fi
+    
+    # Update Python packages for hpc_runner
+    if [ -d "hpc_runner" ]; then
+        echo "Updating hpc_runner Python packages..."
+        cd hpc_runner && uv lock --upgrade && uv sync && cd ..
+        echo ""
+    fi
+    
+    echo "✅ All dependencies updated!"
+
+# Build all projects
+build: _ensure-npm _ensure-dotnet
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Build .NET server
+    if [ -d "server" ]; then
+        echo "Building .NET server..."
+        dotnet build
+    fi
+    # Build React client
+    if [ -d "client" ]; then
+        echo "Building client..."
+        cd client && npm run build && cd ..
+    fi
+    # Build workers
     if [ -d "workers" ]; then
         echo "Building workers..."
         cd workers && npm run build && cd ..
@@ -96,13 +147,15 @@ clean:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Cleaning build artifacts..."
-    [ -d "frontend/.next" ] && rm -rf frontend/.next
-    [ -d "frontend/node_modules" ] && rm -rf frontend/node_modules
+    # .NET artifacts
+    find . -type d \( -name "bin" -o -name "obj" \) -not -path "*/node_modules/*" -prune -exec rm -rf {} + 2>/dev/null || true
+    # Node modules and build artifacts
+    [ -d "client/node_modules" ] && rm -rf client/node_modules
+    [ -d "client/dist" ] && rm -rf client/dist
     [ -d "workers/node_modules" ] && rm -rf workers/node_modules
-    [ -d "controller/.venv" ] && rm -rf controller/.venv
+    # Python artifacts
     [ -d "hpc_runner/.venv" ] && rm -rf hpc_runner/.venv
-    [ -d "controller/__pycache__" ] && rm -rf controller/__pycache__
-    [ -d "hpc_runner/__pycache__" ] && rm -rf hpc_runner/__pycache__
+    find hpc_runner -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
     echo "✅ Clean complete!"
 
 # Pre-commit workflow: comprehensive validation with coverage before committing
@@ -114,17 +167,17 @@ commit-check: lint test-coverage
 dev:
     docker compose up --build
 
-# Start only controller (local)
-dev-controller: _ensure-uv
-    cd controller && uv run uvicorn main:app --reload
+# Start only server (local)
+dev-server: _ensure-dotnet
+    dotnet watch --project server/server.csproj
 
 # Stop all Docker services
 dev-down:
     docker compose down
 
-# Start only frontend (local)
-dev-frontend: _ensure-npm
-    cd frontend && npm run dev
+# Start only client (local)
+dev-client: _ensure-npm
+    cd client && npm run dev
 
 # View Docker logs
 dev-logs:
@@ -151,16 +204,18 @@ help:
     @echo ""
     @echo "Quality Check Groups:"
     @echo "  just lint          # All linting (code + docs + config)"
-    @echo "  just lint-code     # Code linting (Python, JavaScript, Shell)"
+    @echo "  just lint-code     # Code linting (.NET, Python, JavaScript, Shell)"
     @echo "  just lint-docs     # Documentation linting (Markdown, Spelling)"
     @echo "  just lint-config   # Configuration validation (JSON, YAML, Actions)"
     @echo ""
     @echo "Security:"
     @echo "  just audit         # Check for vulnerabilities in dependencies"
+    @echo "  just update        # Update all dependencies to latest versions"
     @echo ""
     @echo "Testing:"
     @echo "  just test          # Run all tests"
     @echo "  just test-coverage # Run all tests with coverage reports"
+    @echo "  just test-dotnet   # .NET tests only"
     @echo "  just test-python   # Python tests only"
     @echo "  just test-js       # JavaScript tests only"
     @echo ""
@@ -169,17 +224,26 @@ help:
     @echo "  just dev-up        # Start all services (detached)"
     @echo "  just dev-down      # Stop all services"
     @echo "  just dev-logs      # View logs"
-    @echo "  just dev-frontend  # Start only frontend (local)"
-    @echo "  just dev-controller # Start only controller (local)"
+    @echo "  just dev-client    # Start only client (local)"
+    @echo "  just dev-server    # Start only server (local)"
     @echo "  just dev-workers   # Start only workers (local)"
+
+# .NET linting
+dotnet-lint: _ensure-dotnet
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -d "server" ]; then
+        echo "Linting .NET projects..."
+        dotnet build /p:TreatWarningsAsErrors=true
+    fi
 
 # JavaScript/TypeScript linting
 js-lint: _ensure-npm
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -d "frontend" ]; then
-        echo "Linting frontend..."
-        cd frontend && npm run lint && cd ..
+    if [ -d "client" ]; then
+        echo "Linting client..."
+        cd client && npm run lint && cd ..
     fi
     if [ -d "workers" ]; then
         echo "Linting workers..."
@@ -189,8 +253,8 @@ js-lint: _ensure-npm
 # All linting: code + documentation + configuration
 lint: lint-code lint-docs lint-config
 
-# Code linting: Python + JavaScript + Shell
-lint-code: python-lint js-lint shell-lint
+# Code linting: .NET + Python + JavaScript + Shell
+lint-code: dotnet-lint python-lint js-lint shell-lint
 
 # Configuration validation: JSON, YAML, GitHub Actions workflows
 lint-config: validate-json validate-yaml action-lint
@@ -216,10 +280,7 @@ markdown-lint: _ensure-npm
 python-lint: _ensure-uv
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -d "controller" ]; then
-        echo "Linting controller..."
-        cd controller && uv run ruff check . --fix && uv run ruff format . && uv run mypy . && cd ..
-    fi
+    # Only lint hpc_runner (Python still used for HPC processing)
     if [ -d "hpc_runner" ]; then
         echo "Linting hpc_runner..."
         cd hpc_runner && uv run ruff check . --fix && uv run ruff format . && uv run mypy . && cd ..
@@ -258,12 +319,16 @@ setup:
     echo ""
     
     # Check for required tools
-    for tool in uv node npm docker shellcheck shfmt; do
+    for tool in dotnet node npm docker shellcheck shfmt uv; do
         if command -v "$tool" &> /dev/null; then
             echo "  ✓ $tool installed"
         else
             echo "  ✗ $tool NOT installed"
             case "$tool" in
+                dotnet)
+                    echo "    Install: https://dotnet.microsoft.com/download"
+                    echo "    macOS: brew install dotnet"
+                    ;;
                 uv)
                     echo "    Install: https://github.com/astral-sh/uv"
                     echo "    macOS: brew install uv"
@@ -283,12 +348,12 @@ setup:
     done
     
     echo ""
-    echo "Installing Python environments..."
+    echo "Installing dependencies..."
     
-    # Controller setup
-    if [ -d "controller" ]; then
-        echo "  Setting up controller..."
-        cd controller && uv sync && cd ..
+    # .NET restore
+    if [ -d "server" ]; then
+        echo "  Restoring .NET packages..."
+        dotnet restore
     fi
     
     # HPC runner setup
@@ -297,10 +362,10 @@ setup:
         cd hpc_runner && uv sync && cd ..
     fi
     
-    # Frontend setup
-    if [ -d "frontend" ]; then
-        echo "  Setting up frontend..."
-        cd frontend && npm install && cd ..
+    # Client setup
+    if [ -d "client" ]; then
+        echo "  Setting up client..."
+        cd client && npm install && cd ..
     fi
     
     # Workers setup
@@ -342,18 +407,54 @@ spell-check: _ensure-npm
     fi
 
 # Run all tests
-test: test-python test-js
+test: test-dotnet test-python test-js
 
 # Run tests with coverage
-test-coverage: test-python-coverage test-js-coverage
+test-coverage: test-dotnet-coverage test-python-coverage test-js-coverage
+
+# .NET tests
+test-dotnet: _ensure-dotnet
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -d "server" ]; then
+        echo "Testing .NET projects..."
+        dotnet test
+    fi
+
+# .NET tests with coverage
+test-dotnet-coverage: _ensure-dotnet
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -d "server" ]; then
+        echo "Testing .NET projects with coverage..."
+        dotnet test --collect:"XPlat Code Coverage" --results-directory ./coverage
+        echo ""
+        # Add .NET tools to PATH
+        export PATH="$PATH:$HOME/.dotnet/tools"
+        # Install reportgenerator if not available
+        if ! command -v reportgenerator &> /dev/null; then
+            echo "Installing reportgenerator..."
+            dotnet tool install -g dotnet-reportgenerator-globaltool || true
+        fi
+        # Generate text summary for terminal output
+        if command -v reportgenerator &> /dev/null; then
+            echo ""
+            echo "Coverage Summary:"
+            reportgenerator -reports:./coverage/**/coverage.cobertura.xml -targetdir:./coverage -reporttypes:TextSummary > /dev/null 2>&1
+            cat ./coverage/Summary.txt
+        else
+            echo "Coverage report generated in ./coverage directory"
+            echo "Install reportgenerator for terminal summary: dotnet tool install -g dotnet-reportgenerator-globaltool"
+        fi
+    fi
 
 # JavaScript tests
 test-js: _ensure-npm
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
-        echo "Testing frontend..."
-        cd frontend && npm test && cd ..
+    if [ -d "client" ] && [ -f "client/package.json" ]; then
+        echo "Testing client..."
+        cd client && npm test && cd ..
     fi
     if [ -d "workers" ] && [ -f "workers/package.json" ]; then
         echo "Testing workers..."
