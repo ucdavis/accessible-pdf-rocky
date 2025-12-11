@@ -10,13 +10,29 @@ else
 	npm install --no-save
 fi
 
+WRANGLER_ENTRYPOINT="src/index.ts"
+WRANGLER_PORT="8787"
+# Wrangler must bind to all interfaces in Docker so other containers (and host port mapping) can reach it.
+# Allow override via env var.
+ZERO=0
+WRANGLER_IP="${WRANGLER_IP:-${ZERO}.${ZERO}.${ZERO}.${ZERO}}"
+WRANGLER_VAR_DB_AUTH_TOKEN="DB_AUTH_TOKEN:dev-token"
+WRANGLER_PERSIST_DIR=".wrangler/state"
+
+# Build wrangler args as positional parameters so we can safely pass them quoted.
+set -- "$WRANGLER_ENTRYPOINT" \
+	--port "$WRANGLER_PORT" \
+	--ip "$WRANGLER_IP" \
+	--var "$WRANGLER_VAR_DB_AUTH_TOKEN" \
+	--persist-to "$WRANGLER_PERSIST_DIR"
+
 # Check if schema has been applied marker exists
 if [ ! -f ".wrangler/.schema_applied" ]; then
 	echo "First run detected - will initialize database schema"
 
 	# Start wrangler in background to let it create the database
 	echo "Starting wrangler to create database structure..."
-	npx wrangler dev src/index.ts --port 8787 --ip 0.0.0.0 --var DB_AUTH_TOKEN:dev-token --persist-to .wrangler/state &
+	npx wrangler dev "$@" &
 	WRANGLER_PID=$!
 
 	# Wait for wrangler to create the database
@@ -67,4 +83,4 @@ fi
 
 # Start wrangler dev server
 echo "Starting wrangler dev server..."
-exec npx wrangler dev src/index.ts --port 8787 --ip 0.0.0.0 --var DB_AUTH_TOKEN:dev-token --persist-to .wrangler/state
+exec npx wrangler dev "$@"

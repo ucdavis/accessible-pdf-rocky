@@ -97,6 +97,9 @@ interface ProcessingMetric {
 				const jobIdMatch = url.pathname.match(/^\/jobs\/([^/]+)$/);
 				if (jobIdMatch) {
 					const jobId = jobIdMatch[1];
+					if (!jobId) {
+						return new Response('Invalid job ID', { status: 400, headers: corsHeaders });
+					}
 					if (request.method === 'GET') {
 						return await getJob(jobId, env, corsHeaders);
 					}
@@ -117,6 +120,9 @@ interface ProcessingMetric {
 				const userIdMatch = url.pathname.match(/^\/users\/([^/]+)$/);
 				if (userIdMatch) {
 					const userId = userIdMatch[1];
+					if (!userId) {
+						return new Response('Invalid user ID', { status: 400, headers: corsHeaders });
+					}
 					if (request.method === 'GET') {
 						return await getUser(userId, env, corsHeaders);
 					}

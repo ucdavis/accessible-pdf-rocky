@@ -244,7 +244,7 @@ The `MetricsClient` service is already configured in the .NET project with:
 
 - `HttpClient` for pushing metrics
 - Configuration binding for `METRICS_ENDPOINT` and `METRICS_TOKEN`
-- Default source: `dotnet-server`
+- Default source: `server`
 
 No additional dependencies needed - the service is registered in `Program.cs`.
 
@@ -264,7 +264,7 @@ curl -X POST http://localhost:5165/api/jobs \
   }'
 
 # Verify metrics were pushed to Cloudflare
-curl "https://metrics-ingest.<your-account>.workers.dev/api/metrics?source=dotnet-server&window=5m"
+curl "https://metrics-ingest.<your-account>.workers.dev/api/metrics?source=server&window=5m"
 ```
 
 ## Step 4: Configure Prometheus & Grafana

@@ -88,7 +88,7 @@ export default {
 		}
 	},
 
-	async scheduled(event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
+	async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
 		// Automated data retention - delete old metrics
 		const retentionDays = parseInt(env.METRICS_RETENTION_DAYS || '7', 10);
 		const cutoffTimestamp = Math.floor(Date.now() / 1000) - retentionDays * 86400;
@@ -134,6 +134,14 @@ async function handleIngest(request: Request, env: Env, corsHeaders: Record<stri
 	// Validate payload
 	if (!payload.source || !payload.timestamp || !payload.metrics) {
 		return new Response('Invalid payload: missing source, timestamp, or metrics', {
+			status: 400,
+			headers: corsHeaders,
+		});
+	}
+
+	// Validate source is one of the allowed values
+	if (payload.source !== 'hpc' && payload.source !== 'server') {
+		return new Response('Invalid payload: source must be "hpc" or "server"', {
 			status: 400,
 			headers: corsHeaders,
 		});
@@ -212,7 +220,7 @@ async function handlePrometheusMetrics(env: Env): Promise<Response> {
 	let output = '';
 	const groupedMetrics = new Map<string, MetricRow[]>();
 
-	for (const row of results as MetricRow[]) {
+	for (const row of results as unknown as MetricRow[]) {
 		if (!groupedMetrics.has(row.metric_name)) {
 			groupedMetrics.set(row.metric_name, []);
 		}
@@ -283,7 +291,7 @@ async function handleApiSources(env: Env, corsHeaders: Record<string, string>): 
 		ORDER BY source
 	`).bind(Math.floor(Date.now() / 1000) - 3600).all(); // Last hour
 
-	const sources = results.map((row: { source: string }) => row.source);
+	const sources = (results as unknown as Array<{ source: string }>).map((row) => row.source);
 
 	return new Response(JSON.stringify(sources, null, 2), {
 		headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -294,12 +302,17 @@ function parseWindow(window: string): number {
 	const match = window.match(/^(\d+)([smhd])$/);
 	if (!match) return 3600; // Default 1h in seconds
 
-	const [, num, unit] = match;
+	const num = match[1];
+	const unit = match[2];
+	if (!num || !unit) return 3600;
+
 	const multipliers: Record<string, number> = {
 		s: 1,
 		m: 60,
 		h: 3600,
 		d: 86400,
 	};
-	return parseInt(num) * multipliers[unit];
+	const multiplier = multipliers[unit];
+	if (multiplier === undefined) return 3600;
+	return parseInt(num, 10) * multiplier;
 }

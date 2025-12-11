@@ -11,7 +11,7 @@
     "moduleResolution": "bundler",
     "target": "esnext",
     "lib": ["ES2021", "WebWorker"],
-    "types": ["@cloudflare/worker-types"],
+    "types": ["@cloudflare/workers-types"],
     // For nodejs:
     // "lib": ["esnext"],
     // "types": ["node"],
