@@ -8,7 +8,7 @@ This guide covers deploying the push-based metrics system using Cloudflare Worke
 flowchart TD
     HPC["HPC SLURM Cluster<br/>(Cron Job)<br/>Push Metrics"] -->|HTTPS POST<br/>/ingest| Worker
     
-    FastAPI["FastAPI Controller<br/>Push Metrics"] -->|HTTPS POST<br/>/ingest| Worker
+    .NET API[".NET API Server<br/>Push Metrics"] -->|HTTPS POST<br/>/ingest| Worker
     
     Worker["Cloudflare Worker<br/>Metrics Ingest<br/>• D1 Storage<br/>• Token Auth<br/>• /ingest endpoint<br/>• /metrics endpoint"] --> D1
     
@@ -19,7 +19,7 @@ flowchart TD
     Monitoring["Prometheus + Grafana<br/>• Scrapes /metrics<br/>• Visualizations<br/>• Alerting"]
     
     style HPC fill:#ff9999,stroke:#cc0000,stroke-width:3px,color:#000
-    style FastAPI fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
+    style .NET API fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
     style Worker fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
     style D1 fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
     style Monitoring fill:#ffeb99,stroke:#cc9900,stroke-width:3px,color:#000
@@ -27,7 +27,7 @@ flowchart TD
 
 **Key Benefits:**
 
-- ✅ No inbound connections to HPC or FastAPI
+- ✅ No inbound connections to HPC or .NET API server
 - ✅ HPC only needs outbound HTTPS (firewall-friendly)
 - ✅ Free tier (D1 + Workers)
 - ✅ Secure (token-based authentication)
@@ -87,7 +87,7 @@ npx wrangler secret put METRICS_AUTH_TOKEN
 # Paste the generated token when prompted
 ```
 
-**IMPORTANT:** Save this token securely - you'll need it for HPC and FastAPI configuration.
+**IMPORTANT:** Save this token securely - you'll need it for HPC and .NET API server configuration.
 
 ### 1.5 Deploy Worker
 
@@ -140,7 +140,7 @@ npm run deploy
 
 ### 2.1 Update Script Configuration
 
-Edit `controller/hpc/scripts/export_slurm_metrics.sh`:
+Edit `hpc_runner/scripts/export_slurm_metrics.sh`:
 
 ```bash
 # Replace these values
@@ -166,7 +166,7 @@ BASH_ENV=/home/youruser/.metrics_token
 
 ```bash
 # From your local machine
-scp controller/hpc/scripts/export_slurm_metrics.sh user@hpc-login.ucdavis.edu:/tmp/
+scp hpc_runner/scripts/export_slurm_metrics.sh user@hpc-login.ucdavis.edu:/tmp/
 
 # On HPC login node
 ssh user@hpc-login.ucdavis.edu
@@ -215,7 +215,7 @@ curl https://metrics-ingest.<your-account>.workers.dev/api/sources
 curl "https://metrics-ingest.<your-account>.workers.dev/api/metrics?source=hpc&window=5m"
 ```
 
-## Step 3: Configure FastAPI Controller
+## Step 3: Configure .NET API Server
 
 ### 3.1 Set Environment Variables
 
@@ -223,7 +223,7 @@ For Azure Container Apps:
 
 ```bash
 az containerapp update \
-  --name accessible-pdf-controller \
+  --name accessible-pdf-server \
   --resource-group your-rg \
   --set-env-vars \
     METRICS_ENDPOINT="https://metrics-ingest.<your-account>.workers.dev/ingest" \
@@ -233,53 +233,38 @@ az containerapp update \
 For local development:
 
 ```bash
-# In controller/.env
+# In server/.env or appsettings.Development.json
 METRICS_ENDPOINT=https://metrics-ingest.<your-account>.workers.dev/ingest
 METRICS_TOKEN=your-token-here
 ```
 
-### 3.2 Update pyproject.toml
+### 3.2 Verify Dependencies
 
-Ensure `httpx` is in dependencies:
+The `MetricsClient` service is already configured in the .NET project with:
 
-```toml
-[project]
-dependencies = [
-    "fastapi",
-    "httpx",  # Add if not present
-    # ... other deps
-]
-```
+- `HttpClient` for pushing metrics
+- Configuration binding for `METRICS_ENDPOINT` and `METRICS_TOKEN`
+- Default source: `dotnet-server`
 
-### 3.3 Install Dependencies
+No additional dependencies needed - the service is registered in `Program.cs`.
+
+### 3.3 Test Metrics Push
 
 ```bash
-cd controller
-uv sync
-```
+# Start .NET API locally
+cd server
+dotnet run
 
-### 3.4 Test Metrics Push
+# In another terminal, trigger a job submission (which pushes metrics)
+curl -X POST http://localhost:5165/api/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pdfUrl": "https://example.com/test.pdf",
+    "options": {}
+  }'
 
-```bash
-# Start FastAPI locally
-cd controller
-uv run uvicorn main:app --reload
-
-# In another terminal, trigger a metric
-python -c "
-import asyncio
-from metrics import push_metrics
-
-async def test():
-    await push_metrics({
-        'test_metric': 123.45
-    })
-
-asyncio.run(test())
-"
-
-# Verify in Cloudflare
-curl "https://metrics-ingest.<your-account>.workers.dev/api/metrics?source=fastapi&window=5m"
+# Verify metrics were pushed to Cloudflare
+curl "https://metrics-ingest.<your-account>.workers.dev/api/metrics?source=dotnet-server&window=5m"
 ```
 
 ## Step 4: Configure Prometheus & Grafana
@@ -403,7 +388,7 @@ npx wrangler secret put METRICS_AUTH_TOKEN
 # Paste new token
 
 # Update HPC script (in ~/.metrics_token or crontab)
-# Update FastAPI environment variables
+# Update .NET API server environment variables
 # Both should continue working during rotation window
 ```
 
@@ -424,16 +409,16 @@ export METRICS_ENDPOINT='https://...'
 squeue -h | wc -l
 ```
 
-### FastAPI metrics not appearing
+### .NET API server metrics not appearing
 
 ```bash
 # Check environment variables
-az containerapp show --name accessible-pdf-controller \
+az containerapp show --name accessible-pdf-server \
   --resource-group your-rg \
   --query "properties.configuration.secrets" -o json
 
 # Check logs
-az containerapp logs tail --name accessible-pdf-controller \
+az containerapp logs tail --name accessible-pdf-server \
   --resource-group your-rg --follow
 ```
 
@@ -478,7 +463,7 @@ journalctl -u prometheus -f
    - For longer retention, export to external storage
 
 4. **Access Control**
-   - Only HPC and FastAPI need write access (via token)
+   - Only HPC and .NET API server need write access (via token)
    - Prometheus has read-only access (public /metrics)
    - Consider adding IP allowlist if needed
 
@@ -488,7 +473,7 @@ journalctl -u prometheus -f
 
 - Storage: 5GB free ≈ millions of metrics
 - Reads: 5M/day free ≈ Prometheus scraping every 30s
-- Writes: 100K/day free ≈ HPC (1/min) + FastAPI (1000/hr)
+- Writes: 100K/day free ≈ HPC (1/min) + .NET API server (1000/hr)
 - **Expected Cost: $0/month**
 
 **Prometheus/Grafana**
@@ -501,7 +486,7 @@ journalctl -u prometheus -f
 
 1. Set up alerting rules in Prometheus (see docs/MONITORING_SETUP.md)
 2. Create custom Grafana dashboards for your metrics
-3. Add more metrics as needed in FastAPI controller
+3. Add more metrics as needed in the .NET API server
 4. Consider adding Azure metrics if deployed there
 
 ## References

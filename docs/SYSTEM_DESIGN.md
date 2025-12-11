@@ -201,24 +201,34 @@ flowchart LR
 
 **Implementation:**
 
-```python
-# controller/services/wcag_engine.py
-class WCAGValidator:
-    def validate_heading_hierarchy(self, elements):
-        """Ensure no skipped heading levels (H1 → H3 invalid)"""
-        pass
+```csharp
+// Conceptual - WCAG validation happens in hpc_runner (Python)
+// .NET API focuses on orchestration, not rule validation
+public class WCAGValidator
+{
+    public bool ValidateHeadingHierarchy(List<Element> elements)
+    {
+        // Ensure no skipped heading levels (H1 → H3 invalid)
+        return true;
+    }
     
-    def enforce_list_structure(self, elements):
-        """Wrap list items in proper <ul>/<ol> tags"""
-        pass
+    public void EnforceListStructure(List<Element> elements)
+    {
+        // Wrap list items in proper <ul>/<ol> tags
+    }
     
-    def validate_alt_text(self, images):
-        """Check all images have alt text or marked decorative"""
-        pass
+    public bool ValidateAltText(List<Image> images)
+    {
+        // Check all images have alt text or marked decorative
+        return true;
+    }
     
-    def build_structure_tree(self, elements):
-        """Create proper tagged PDF structure tree"""
-        pass
+    public StructureTree BuildStructureTree(List<Element> elements)
+    {
+        // Create proper tagged PDF structure tree
+        return new StructureTree();
+    }
+}
 ```
 
 ### Stage 6: Accessible PDF Construction
@@ -307,9 +317,9 @@ flowchart LR
 
 ### Two-Layer Orchestration
 
-**Layer 1: Controller (Cloudflare ↔ HPC ↔ [R2](https://developers.cloudflare.com/r2/) Flow)**
+**Layer 1: .NET API Server (Cloudflare ↔ HPC ↔ [R2](https://developers.cloudflare.com/r2/) Flow)**
 
-The `controller/services/` layer orchestrates job flow between components:
+The `.NET API server/Services/` layer orchestrates job flow between components:
 
 - Pulls jobs from [Cloudflare Queue](https://developers.cloudflare.com/queues/)
 - Downloads PDFs from [R2](https://developers.cloudflare.com/r2/)
@@ -329,46 +339,35 @@ The `hpc_runner/` layer orchestrates heavy ML processing:
 - Parses tables
 - Outputs results
 
-### [FastAPI](https://fastapi.tiangolo.com/) Job Pipeline (Controller)
+### .NET 8 Web API Job Pipeline (Conceptual)
 
-```python
-# controller/services/job_runner.py
-async def process_pdf_job(job_id: str, pdf_path: Path) -> tuple[Path, dict]:
-    """Orchestrate Cloudflare ↔ HPC ↔ R2 flow"""
+```csharp
+// Conceptual - Current implementation focuses on orchestration
+// Heavy processing happens in hpc_runner (Python)
+public async Task<(string outputPdf, Report report)> ProcessPdfJobAsync(
+    string jobId, 
+    string pdfPath)
+{
+    // Orchestrate Cloudflare ↔ HPC ↔ R2 flow
     
-    # 1. Download PDF from R2
-    pdf_path = await download_pdf_from_r2(job_id)
+    // 1. Generate presigned R2 URLs
+    var inputUrl = GeneratePresignedUrl(pdfPath, "get", 3600);
+    var outputUrl = GeneratePresignedUrl($"outputs/{jobId}/accessible.pdf", "put", 3600);
     
-    # 2. Classify & preprocess locally
-    pdf_type = detect_pdf_type(pdf_path)
+    // 2. Submit to HPC for heavy ML processing
+    var slurmId = await SubmitSlurmJobAsync(jobId, inputUrl, outputUrl);
     
-    # 3. Submit to HPC for heavy ML processing
-    slurm_id = submit_slurm_job(job_id, pdf_path)
+    // 3. Monitor HPC job
+    await MonitorSlurmJobAsync(slurmId);
     
-    # 4. Monitor HPC job
-    await monitor_slurm_job(slurm_id)
+    // 4. Update database status
+    await _dbClient.UpdateJobStatusAsync(jobId, "completed", null);
     
-    # 5. Retrieve results from HPC
-    hpc_results = await retrieve_hpc_results(job_id)
+    // 5. Generate report (from HPC results)
+    var report = await GenerateComplianceReportAsync(jobId);
     
-    # 6. Local WCAG validation & repair
-    validated = wcag_engine.validate_and_repair(
-        hpc_results["layout"],
-        hpc_results["reading_order"],
-        hpc_results["alt_texts"],
-        hpc_results["tables"]
-    )
-    
-    # 7. Build accessible PDF locally
-    output_pdf = build_tagged_pdf(validated, pdf_path)
-    
-    # 8. Upload to R2
-    await upload_to_r2(output_pdf, job_id)
-    
-    # 9. Generate report
-    report = generate_compliance_report(validated)
-    
-    return output_pdf, report
+    return (outputUrl, report);
+}
 ```
 
 ### HPC ML Pipeline (GPU Processing)
@@ -403,18 +402,18 @@ def analyze_pdf(pdf_path: str, job_id: str) -> dict:
     }
 ```
 
-### Service Layer Organization (Controller)
+### Service Layer Organization (.NET API Server)
 
-Runs on [FastAPI](https://fastapi.tiangolo.com/) controller, orchestrates Cloudflare ↔ HPC ↔ [R2](https://developers.cloudflare.com/r2/):
+Runs on [.NET 8 Web API](https://learn.microsoft.com/en-us/aspnet/core/web-api/) server, orchestrates Cloudflare ↔ HPC ↔ [R2](https://developers.cloudflare.com/r2/):
 
 ```
-controller/services/
-├── pdf_parser.py          # [PyMuPDF](https://pymupdf.readthedocs.io/)/[pdfplumber](https://github.com/jsvine/pdfplumber) extraction (lightweight)
-├── pdf_normalizer.py      # Type detection, preprocessing
-├── ocr_engine.py          # OCR orchestration (may delegate to HPC)
-├── wcag_engine.py         # Rule-based validation
-├── pdf_builder.py         # Tagged PDF construction
-└── job_runner.py          # Main orchestration (Cloudflare ↔ HPC flow)
+server/Services/
+├── DatabaseApiClient.cs   # HTTP client for Cloudflare D1
+├── MetricsClient.cs       # Push metrics to worker
+└── (Future: SlurmClient, R2Client, etc.)
+
+server/Controllers/
+└── JobController.cs       # Job status endpoints
 ```
 
 ### AI Inference Layer (HPC GPU Nodes)
@@ -444,7 +443,7 @@ hpc_runner/
 
 **Key Distinction:**
 
-- `controller/services/` = Lightweight orchestration, no heavy ML
+- `.NET API server/Services/` = Lightweight orchestration, no heavy ML
 - `hpc_runner/` = Heavy GPU-based ML processing
 
 #### HPC Runner Internal Architecture: ai/ vs processors/
@@ -554,15 +553,15 @@ def analyze_pdf(pdf_path, job_id):
 
 This separation keeps ML model concerns separate from business logic and makes the codebase more maintainable.
 
-### Addressing Naming Overlap: controller/services vs hpc_runner
+### Addressing Naming Overlap: .NET API services vs hpc_runner
 
-**Important:** You'll notice similar file names in `controller/services/` and `hpc_runner/` (e.g., `ocr_engine.py`, `wcag.py`). This overlap is **intentional** and serves different purposes:
+**Important:** You'll notice similar file names in `.NET API services/` and `hpc_runner/` (e.g., `ocr_engine.py`, `wcag.py`). This overlap is **intentional** and serves different purposes:
 
 #### Runtime Environments
 
 | Layer | Where | Resources | Purpose |
 |-------|-------|-----------|----------|
-| `controller/services/` | FastAPI server (VM) | CPU only, lightweight | Orchestrate Cloudflare ↔ HPC ↔ R2 flow |
+| `.NET API services/` | .NET 8 Web API server (VM) | CPU only, lightweight | Orchestrate Cloudflare ↔ HPC ↔ R2 flow |
 | `hpc_runner/` | HPC GPU nodes | A100/H100 GPUs, 10s GB RAM | Heavy ML processing |
 
 #### Why Similar Names?
@@ -575,7 +574,7 @@ These layers handle the **same domain** (OCR, WCAG, PDF) but at **different stag
 
 **1. OCR Processing**
 
-`controller/services/ocr_engine.py`:
+`.NET API services/ocr_engine.py`:
 
 - Can analyze PDF metadata before submission
 - Helps determine job parameters
@@ -589,7 +588,7 @@ These layers handle the **same domain** (OCR, WCAG, PDF) but at **different stag
 
 **2. WCAG Validation**
 
-`controller/services/wcag_engine.py`:
+`.NET API services/wcag_engine.py`:
 
 - May provide validation utilities for API responses
 - Helper functions for status reporting
@@ -603,7 +602,7 @@ These layers handle the **same domain** (OCR, WCAG, PDF) but at **different stag
 
 **3. PDF Operations**
 
-`controller/services/pdf_builder.py`:
+`.NET API services/pdf_builder.py`:
 
 - May provide utility functions
 - No longer builds final PDFs
@@ -723,7 +722,7 @@ flowchart TD
 
 ### D1 Database with API Worker
 
-The system uses [Cloudflare D1](https://developers.cloudflare.com/d1/) (SQLite) accessed via a dedicated API Worker (`workers/db-api`). FastAPI controller communicates with the database through HTTP REST API, not direct connections.
+The system uses [Cloudflare D1](https://developers.cloudflare.com/d1/) (SQLite) accessed via a dedicated API Worker (`workers/db-api`). .NET 8 Web API controller communicates with the database through HTTP REST API, not direct connections.
 
 **Benefits:**
 
@@ -840,18 +839,21 @@ CREATE TABLE alt_texts (
 
 ### Database Access Pattern
 
-Controller → HTTP API → D1 Worker → D1 Database
+.NET API → HTTP API → D1 Worker → D1 Database
 
-```python
-# controller/db/client.py
-from db.client import get_db_client
+```csharp
+// server/Services/DatabaseApiClient.cs (actual implementation)
+var dbClient = new DatabaseApiClient(httpClient, config, logger);
 
-db = get_db_client()
-job = await db.create_job(
-    job_id=uuid4(),
-    r2_key="uploads/document.pdf",
-    status="submitted"
-)
+var job = await dbClient.CreateJobAsync(
+    jobId: Guid.NewGuid(),
+    r2Key: "uploads/document.pdf",
+    slurmId: null,
+    userId: null,
+    cancellationToken: default
+);
+
+// Returns Job object with Status automatically set to "Submitted"
 ```
 
 See `workers/db-api/README.md` for API documentation.

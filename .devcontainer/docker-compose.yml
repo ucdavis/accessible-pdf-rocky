@@ -1,0 +1,42 @@
+services:
+  devcontainer:
+    build:
+      context: ..
+      dockerfile: .devcontainer/dev.Dockerfile
+    volumes:
+      - ..:/workspace:cached
+    depends_on:
+      db-api:
+        condition: service_healthy
+    networks:
+      - dev
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: /bin/sh -c "while sleep 1000; do :; done"
+    # ports: # let vscode handle port forwarding
+    #   - "5173:5173"
+    #   - "5165:5165"
+    #   - "8787:8787"
+
+  db-api:
+    image: node:20
+    working_dir: /workspace/workers/db-api
+    volumes:
+      - ..:/workspace:cached
+      # Override node_modules to prevent host modules from being used
+      - db-api-node-modules:/workspace/workers/db-api/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8787/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dev
+    command: sh -c "npm install && npx wrangler dev src/index.ts --port 8787 --ip 0.0.0.0"
+
+volumes:
+  db-api-node-modules:
+
+networks:
+  dev:
+    driver: bridge

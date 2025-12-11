@@ -1,30 +1,35 @@
 # Architecture
 
-This document outlines the production-grade architecture for the accessible PDF system, integrating [Cloudflare Workers](https://developers.cloudflare.com/workers/), [FastAPI](https://fastapi.tiangolo.com/), and local HPC with SLURM.
+This document outlines the production-grade architecture for the accessible PDF system, integrating [Cloudflare Workers](https://developers.cloudflare.com/workers/), [.NET 8](https://learn.microsoft.com/en-us/aspnet/core/) on Azure, and local HPC with SLURM.
 
 ## System Architecture Overview
 
 ### 🔵 Cloudflare Layer (cheap, edge, fast, on-demand, scalable)
 
-- **[Next.js](https://nextjs.org/) frontend** on [Cloudflare Pages](https://developers.cloudflare.com/pages/)
+- **[React 19](https://react.dev/) + [Vite](https://vite.dev/) frontend** on [Cloudflare Pages](https://developers.cloudflare.com/pages/)
+  - Static site deployed to global CDN
+  - [TanStack Router](https://tanstack.com/router) for file-based routing
+  - [TanStack Query](https://tanstack.com/query) for data fetching and caching
+  - Deployed via Azure Pipelines
 - **[Cloudflare Worker](https://developers.cloudflare.com/workers/) API**:
   - PDF upload → R2
   - Submit jobs → Cloudflare Queue
-  - Expose job status
+  - D1 database operations
 - **[R2](https://developers.cloudflare.com/r2/) Object Storage**:
   - Raw PDFs
   - Intermediate JSON
   - Final WCAG-compliant PDFs
 - **[Cloudflare Queues](https://developers.cloudflare.com/queues/)**:
-  - Routes jobs to GPU inference workers via FastAPI
+  - Routes jobs to GPU inference workers via .NET API
 
 Cloudflare provides fast ingress, scaling, and routing—not heavy compute.
 
-### 🟢 [FastAPI](https://fastapi.tiangolo.com/) Layer (job controller)
+### 🟢 [.NET 8](https://learn.microsoft.com/en-us/aspnet/core/) Layer (job controller)
 
-Runs on a publicly accessible host:
+Runs on [Azure App Service](https://learn.microsoft.com/en-us/azure/app-service/) (Linux):
 
-- [Azure App Service](https://learn.microsoft.com/en-us/azure/app-service/quickstart-python)
+- ASP.NET Core Web API
+- Deployed to Azure via Azure Pipelines
 
 **Responsibilities:**
 
@@ -35,7 +40,7 @@ Runs on a publicly accessible host:
 - Update [D1 database](https://developers.cloudflare.com/d1/) via API Worker
 - Expose API to frontend
 
-The FastAPI service bridges Cloudflare and the HPC cluster.
+The .NET API service bridges Cloudflare and the HPC cluster.
 
 ### 🔴 Local HPC Cluster (heavy compute)
 
@@ -53,19 +58,20 @@ Output flows back to R2:
 
 - SLURM jobs download input PDFs directly from R2
 - SLURM jobs upload processed PDFs directly to R2
-- No file transfers through FastAPI controller
+- No file transfers through .NET API controller
 
 ## System Diagram
 
 ```mermaid
 flowchart TD
-    Frontend["Next.js Frontend<br/>(Cloudflare Pages)"] -->|HTTPS| Workers
+    Frontend["React + Vite Frontend<br/>(Cloudflare Pages)"] -->|HTTPS| Workers
+    Frontend -->|HTTPS| Controller
     
     Workers["Cloudflare Worker API<br/>• PDF Upload<br/>• R2 Put<br/>• Job Submit to Queue"] --> Queue
     
     Queue["Cloudflare Queue<br/>(job messages)"] -->|dequeues| Controller
     
-    Controller["FastAPI Controller<br/>• Pull Queue Jobs<br/>• Generate R2 URLs<br/>• Submit SLURM Jobs<br/>• Monitor sacct/squeue"] --> HPC
+    Controller[".NET 8 Web API<br/>(Azure App Service)<br/>• Pull Queue Jobs<br/>• Generate R2 URLs<br/>• Submit SLURM Jobs<br/>• Monitor sacct/squeue"] --> HPC
     Controller -->|HTTP API| DBWorker
     
     DBWorker["D1 API Worker<br/>• Job tracking<br/>• User management<br/>• Processing metrics"]
@@ -94,29 +100,39 @@ accessible-pdf-rocky/
 │       ├── codeql.yml
 │       └── security.yml
 │
-├── controller/               # FastAPI bridge service (https://fastapi.tiangolo.com/)
-│   ├── main.py
-│   ├── queue_listener.py
-│   ├── hpc/
-│   │   ├── submit.py
-│   │   ├── status.py
-│   │   └── scripts/
-│   │       └── job.sh
-│   ├── r2/
-│   │   ├── upload.py
-│   │   └── download.py
-│   ├── db/
-│   │   ├── models.py
-│   │   └── session.py
-│   ├── services/            # Orchestration services (Cloudflare ↔ HPC ↔ R2)
-│   │   ├── job_runner.py        # Main orchestrator
-│   │   ├── pdf_parser.py        # PDF parsing
-│   │   ├── pdf_normalizer.py    # Type detection
-│   │   ├── ocr_engine.py        # OCR orchestration
-│   │   ├── wcag_engine.py       # WCAG validation
-│   │   ├── pdf_builder.py       # Tagged PDF construction
-│   │   └── result_handler.py    # Result processing
-│   └── pyproject.toml
+├── client/                   # React 19 + Vite on Cloudflare Pages
+│   ├── src/
+│   │   ├── main.tsx          # Application entry point
+│   │   ├── routes/           # TanStack Router file-based routes
+│   │   │   ├── __root.tsx    # Root layout
+│   │   │   ├── index.tsx     # Home page
+│   │   │   ├── upload.tsx    # PDF upload UI
+│   │   │   └── jobs/
+│   │   │       ├── index.tsx          # Jobs list
+│   │   │       └── $jobId.tsx         # Job details with auto-polling
+│   │   ├── components/       # Reusable UI components
+│   │   └── lib/
+│   │       └── api.ts        # API client for .NET endpoints
+│   ├── vite.config.ts        # Vite configuration with API proxy
+│   └── package.json
+│
+├── server/                   # .NET 8 Web API (https://learn.microsoft.com/en-us/aspnet/core/)
+│   ├── Program.cs            # Application entry point
+│   ├── appsettings.json      # Configuration
+│   ├── Controllers/
+│   │   └── JobController.cs  # Job status endpoints
+│   ├── Services/
+│   │   ├── DatabaseApiClient.cs  # Cloudflare D1 API client
+│   │   └── MetricsClient.cs      # Metrics push client
+│   └── server.csproj
+│
+├── server.core/              # Domain models and shared logic
+│   ├── Domain/
+│   │   ├── Job.cs
+│   │   ├── User.cs
+│   │   ├── ProcessingMetric.cs
+│   │   └── JobStatus.cs
+│   └── server.core.csproj
 │
 ├── docs/
 │   ├── ARCHITECTURE.md
@@ -126,23 +142,6 @@ accessible-pdf-rocky/
 │   ├── TESTING.md
 │   └── WHY.md
 │
-├── frontend/                 # Next.js on Cloudflare Pages
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── page.tsx           # Home page
-│   │   │   ├── layout.tsx         # Root layout
-│   │   │   ├── upload/
-│   │   │   │   └── page.tsx       # PDF upload UI
-│   │   │   └── jobs/
-│   │   │       ├── page.tsx       # Jobs list
-│   │   │       └── [id]/
-│   │   │           └── page.tsx   # Job details
-│   │   ├── components/
-│   │   │   ├── UploadForm.tsx     # Upload component
-│   │   │   └── JobStatusBadge.tsx # Status badge
-│   │   └── lib/
-│   │       └── api.ts             # API client
-│   └── package.json
 │
 ├── hpc_runner/               # HPC compute jobs (heavy ML processing)
 │   ├── runner.py             # Main SLURM job script
@@ -173,10 +172,16 @@ accessible-pdf-rocky/
 │   ├── wrangler.toml
 │   └── package.json
 │
+├── tests/                    # .NET xUnit tests
+│   ├── JobControllerTests.cs
+│   └── tests.csproj
+│
 ├── .gitignore
 ├── .markdownlint.json
+├── app.sln
 ├── cspell.json
 ├── docker-compose.yml
+├── global.json
 ├── justfile
 └── README.md
 ```
@@ -194,7 +199,8 @@ accessible-pdf-rocky/
 - **Responsibilities**:
   - Handle PDF uploads → R2
   - Submit jobs → Cloudflare Queue
-  - Proxy status queries → FastAPI
+  - Proxy status queries → .NET API
+  - D1 database operations
 
 #### hpc_runner/ - HPC Compute Jobs (Heavy ML)
 
@@ -219,44 +225,44 @@ accessible-pdf-rocky/
 3. Passes to `processors/*` for validation and business logic
 4. Returns application-ready results
 
-**External Flow**: Frontend → Cloudflare Workers (fast API) → Queue → Controller → SLURM → HPC Runner (heavy ML on GPU) → Results → R2
+**External Flow**: Frontend (Cloudflare Pages) → .NET API (Azure) / Cloudflare Workers → Queue → Controller → SLURM → HPC Runner (heavy ML on GPU) → Results → R2
 
 **Note:** See [SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md) for detailed architecture of the `ai/` vs `processors/` layers.
 
-### Understanding controller/services vs hpc_runner Overlap
+### Understanding server/Services vs hpc_runner Separation
 
-You'll notice some similar file names in both `controller/services/` and `hpc_runner/`. This is **intentional** - they serve different purposes at different stages:
+The .NET API (`server/`) and HPC runner (`hpc_runner/`) have clear separation of concerns.
 
 #### Where They Run
 
-**`controller/services/`** - Runs on FastAPI controller (lightweight VM/server)
+**`server/Services`** - Runs on Azure App Service (.NET Web API)
 
 - **NOT on GPU nodes**
 - Orchestrates the overall flow between Cloudflare ↔ HPC ↔ R2
 - Does lightweight coordination work
 - No heavy ML processing
+- Communicates with Cloudflare D1 via HTTP API
 
 **`hpc_runner/`** - Runs on HPC GPU nodes via SLURM
 
 - **ON GPU nodes with A100/H100**
 - Does heavy ML processing
-- Called by controller via SLURM submission
+- Called by .NET API via SLURM submission
 
-#### The Overlap Cases
+Current architecture focuses on clear separation:
 
-| Functionality | controller/services/ | hpc_runner/ | Why Both? |
-|--------------|---------------------|-------------|----------|
-| **OCR** | `ocr_engine.py`<br/>Orchestrates OCR decisions<br/>"Should we OCR? Which engine?" | `processors/ocr.py`<br/>Actually RUNS OCR<br/>Heavy processing on GPU | Controller decides, HPC executes |
-| **WCAG** | `wcag_engine.py`<br/>Final validation after HPC<br/>Rule-based checks | `processors/wcag.py`<br/>WCAG checks during ML<br/>Validates predictions | Controller validates final output, HPC validates during processing |
-| **PDF Ops** | `pdf_builder.py`<br/>Final PDF assembly<br/>Builds output from results | `processors/tagging.py`<br/>PDF structure tagging<br/>Tags during processing | Controller builds final PDF, HPC adds semantic tags |
+- **`server/Services/DatabaseApiClient.cs`** - HTTP client for Cloudflare D1 database operations
+- **`server/Services/MetricsClient.cs`** - Pushes processing metrics to Cloudflare Worker
+- **`server/Controllers/JobController.cs`** - Exposes job status endpoints to frontend
+- **`hpc_runner/`** - All heavy ML processing (layout detection, OCR, WCAG, PDF tagging)
 
 #### Complete Flow Example
 
 ```mermaid
 flowchart TD
-    A["1. User uploads PDF to R2"] --> B["2. Controller receives job<br/>from Cloudflare Queue"]
-    B --> C["3. Controller generates<br/>presigned R2 URLs"]
-    C --> D["4. Controller submits<br/>SLURM job with URLs"]
+    A["1. User uploads PDF to R2"] --> B["2. .NET API receives job<br/>from Cloudflare Queue"]
+    B --> C["3. .NET API generates<br/>presigned R2 URLs"]
+    C --> D["4. .NET API submits<br/>SLURM job with URLs"]
     
     D --> E["5. SLURM job starts:"]
     
@@ -268,7 +274,7 @@ flowchart TD
     E4 --> E5["f. Upload result to R2"]
     
     E5 --> F["6. Job completes"]
-    F --> G["7. Controller updates<br/>database status"]
+    F --> G["7. .NET API updates<br/>database status via D1 Worker"]
     
     style A fill:#80d4ff,stroke:#0066cc,stroke-width:2px,color:#000
     style B fill:#90ee90,stroke:#228b22,stroke-width:2px,color:#000
@@ -285,11 +291,11 @@ flowchart TD
     style G fill:#90ee90,stroke:#228b22,stroke-width:2px,color:#000
 ```
 
-**Key Insight:** Controller generates presigned URLs and orchestrates job submission. HPC jobs download inputs, perform all processing, and upload outputs directly to R2. No file transfers through the controller.
+**Key Insight:** .NET API generates presigned URLs and orchestrates job submission. HPC jobs download inputs, perform all processing, and upload outputs directly to R2. No file transfers through the API.
 
 ## Data Flow
 
-### 1. Cloudflare Worker → Queue → FastAPI Controller
+### 1. Cloudflare Worker → Queue → .NET API Controller
 
 #### Worker: submit-job.ts
 
@@ -313,78 +319,109 @@ export default {
 };
 ```
 
-### 2. FastAPI Controller: Queue Listener
+### 2. .NET API Controller: Queue Listener
 
-#### queue_listener.py
+#### QueueListener.cs (conceptual)
 
-```python
-import asyncio
-from cloudflare_queue import CloudflareQueueConsumer
-from hpc.submit import submit_slurm_job
-from r2.presigned import generate_presigned_urls
-from db.session import db_session
-from db.models import Job
+```csharp
+using Server.Services;
 
-consumer = CloudflareQueueConsumer("JOB_QUEUE")
+public class QueueListener : BackgroundService
+{
+    private readonly DatabaseApiClient _dbClient;
+    private readonly ILogger<QueueListener> _logger;
 
-@consumer.on_message
-async def handle_job(message):
-    job_id = message["jobId"]
-    r2_key = message["r2Key"]
+    public QueueListener(DatabaseApiClient dbClient, ILogger<QueueListener> logger)
+    {
+        _dbClient = dbClient;
+        _logger = logger;
+    }
 
-    # Generate presigned URLs for SLURM job
-    input_url = generate_presigned_urls(r2_key, operation="get", expires=3600)
-    output_key = f"outputs/{job_id}/accessible.pdf"
-    output_url = generate_presigned_urls(output_key, operation="put", expires=3600)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            // Poll Cloudflare Queue for new messages
+            var message = await PollQueueAsync(stoppingToken);
+            if (message != null)
+            {
+                await HandleJobAsync(message, stoppingToken);
+            }
+            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+        }
+    }
 
-    # Submit SLURM job with URLs
-    slurm_id = submit_slurm_job(job_id, input_url, output_url)
+    private async Task HandleJobAsync(QueueMessage message, CancellationToken ct)
+    {
+        var jobId = message.JobId;
+        var r2Key = message.R2Key;
 
-    # Save slurm_id in DB
-    with db_session() as db:
-        job = Job(id=job_id, slurm_id=slurm_id, status="submitted")
-        db.add(job)
-        db.commit()
+        // Generate presigned URLs for SLURM job
+        var inputUrl = GeneratePresignedUrl(r2Key, "get", 3600);
+        var outputKey = $"outputs/{jobId}/accessible.pdf";
+        var outputUrl = GeneratePresignedUrl(outputKey, "put", 3600);
 
-consumer.run()
+        // Submit SLURM job with URLs
+        var slurmId = await SubmitSlurmJobAsync(jobId, inputUrl, outputUrl);
+
+        // Update database via D1 API Worker
+        await _dbClient.UpdateJobStatusAsync(jobId, "submitted", slurmId);
+    }
+}
 ```
 
-### 3. SLURM Submission from FastAPI
+### 3. SLURM Submission from .NET API
 
-#### hpc/submit.py
+#### SlurmSubmitter.cs (conceptual)
 
-```python
-import subprocess
-from pathlib import Path
+```csharp
+using System.Diagnostics;
 
-def submit_slurm_job(job_id: str, input_url: str, output_url: str) -> str:
-    """
-    Submit a SLURM job for PDF accessibility analysis.
-    
-    Args:
-        job_id: Unique job identifier
-        input_url: Presigned R2 URL to download input PDF
-        output_url: Presigned R2 URL to upload output PDF
+public class SlurmSubmitter
+{
+    public async Task<string> SubmitSlurmJobAsync(
+        string jobId,
+        string inputUrl,
+        string outputUrl)
+    {
+        /*
+        Submit a SLURM job for PDF accessibility analysis.
         
-    Returns:
-        SLURM job ID as a string
-    """
-    script_path = Path(__file__).parent / "scripts" / "job.sh"
-    
-    cmd = [
-        "sbatch",
-        f"--job-name=wcag-{job_id}",
-        f"--export=ALL,JOB_ID={job_id},INPUT_URL={input_url},OUTPUT_URL={output_url}",
-        str(script_path),
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    slurm_id = result.stdout.strip().split()[-1]
-    return slurm_id
+        Args:
+            jobId: Unique job identifier
+            inputUrl: Presigned R2 URL to download input PDF
+            outputUrl: Presigned R2 URL to upload output PDF
+            
+        Returns:
+            SLURM job ID as a string
+        */
+        var scriptPath = Path.Combine(AppContext.BaseDirectory, "scripts", "job.sh");
+        
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "sbatch",
+            Arguments = $"--job-name=wcag-{jobId} " +
+                       $"--export=ALL,JOB_ID={jobId},INPUT_URL={inputUrl},OUTPUT_URL={outputUrl} " +
+                       scriptPath,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        
+        using var process = Process.Start(startInfo);
+        var output = await process!.StandardOutput.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        
+        var slurmId = output.Trim().Split(' ').Last();
+        return slurmId;
+    }
+}
 ```
 
 ### 4. SLURM Batch Script (GPU inference)
 
-#### hpc/scripts/job.sh
+#### hpc_runner/scripts/job.sh
 
 ```bash
 #!/bin/bash
@@ -429,7 +466,7 @@ import argparse
 import sys
 from pathlib import Path
 
-def analyze_pdf(pdf_path: str, job_id: str) -> dict:
+async def analyze_pdf(pdf_path: str, job_id: str) -> dict:
     """
     Analyze a PDF file for accessibility issues using two-layer architecture.
     
@@ -496,7 +533,8 @@ def main():
         sys.exit(1)
     
     # Run analysis
-    results = analyze_pdf(args.pdf_path, args.job_id)
+    import asyncio
+    results = asyncio.run(analyze_pdf(args.pdf_path, args.job_id))
     
     # Write results
     if args.output:
@@ -511,7 +549,7 @@ if __name__ == "__main__":
 
 ### 6. SLURM Status Monitoring
 
-#### hpc/status.py
+#### hpc_runner/status.py
 
 ```python
 import subprocess
@@ -531,7 +569,8 @@ def get_slurm_status(slurm_id: str) -> str:
 export default {
   async fetch(req, env) {
     const jobId = new URL(req.url).searchParams.get("jobId");
-    const res = await fetch(`${env.FASTAPI_URL}/status/${jobId}`);
+    // Proxy to .NET API running on Azure
+    const res = await fetch(`${env.DOTNET_API_URL}/api/job/status/${jobId}`);
     return res;
   }
 };
@@ -542,28 +581,39 @@ export default {
 1. **User uploads PDF** → Cloudflare Worker
 2. **Worker saves to R2**
 3. **Worker sends Queue message**
-4. **FastAPI listener pulls job**
-5. **FastAPI generates presigned R2 URLs**
-6. **FastAPI submits SLURM job with URLs**
+4. **.NET API listener pulls job**
+5. **.NET API generates presigned R2 URLs**
+6. **.NET API submits SLURM job with URLs**
 7. **SLURM job downloads PDF from R2**
 8. **SLURM runs ML inference** → produces accessible PDF
 9. **SLURM job uploads result to R2**
-10. **FastAPI updates database**
+10. **.NET API updates database via D1 Worker**
 11. **Frontend polls job status**
 12. **User downloads accessible PDF from R2**
 
 ## Deployment Considerations
 
-### FastAPI Controller
+### React + Vite Frontend (Cloudflare Pages)
 
-- Must be accessible from both Cloudflare (public internet) and HPC cluster
-- Can run on HPC login node or separate VM
-- Needs credentials for:
-  - Cloudflare Queues
-  - R2 storage
-  - D1 database API (via token)
-  - SLURM submission (SSH key and host)
+- **Deployment**: Static site build deployed to Cloudflare Pages via Azure Pipelines
+- **Build**: `npm run build` produces static assets in `dist/`
+- **Routing**: TanStack Router with file-based routing (no SSR required)
+- **API Calls**: Direct to .NET API on Azure (CORS configured)
+- **Environment Variables**: `.env` for API base URL
+- **CDN**: Global edge deployment with automatic scaling
+
+### .NET 8 Web API (Azure App Service)
+
+- **Deployment**: Azure App Service (Linux) via Azure Pipelines
+- **Runtime**: .NET 8.0.400+
+- **Must be accessible from**: Cloudflare (public internet) and HPC cluster
+- **Needs credentials for**:
+  - Cloudflare Queues (API token)
+  - R2 storage (API credentials)
+  - D1 database API (Bearer token)
+  - SLURM submission (SSH key and host access)
   - Metrics endpoint (optional, see [Metrics Deployment](METRICS_DEPLOYMENT.md))
+- **Configuration**: `appsettings.json` and Azure App Settings for secrets
 
 ### HPC Runner
 
@@ -575,10 +625,11 @@ export default {
 
 ### Scaling
 
-- Cloudflare handles edge scaling automatically
-- FastAPI can be horizontally scaled behind load balancer
-- HPC scales via SLURM job scheduling
-- R2 provides unlimited object storage
+- **Cloudflare Pages**: Edge scaling automatic, globally distributed
+- **Azure App Service**: Horizontally scalable with Azure scale-out rules
+- **.NET API**: Can run multiple instances behind Azure Load Balancer
+- **HPC**: Scales via SLURM job scheduling
+- **R2**: Unlimited object storage with global replication
 
 ## Security
 
@@ -590,8 +641,9 @@ export default {
 
 ## Monitoring
 
-- **Cloudflare**: Analytics dashboard
-- **FastAPI**: Push-based metrics to Cloudflare Worker (see [Metrics Deployment](METRICS_DEPLOYMENT.md))
+- **Cloudflare Pages**: Build and deployment metrics, analytics dashboard
+- **Azure App Service**: Application Insights for .NET API monitoring
+- **.NET API**: Push-based metrics to Cloudflare Worker (see [Metrics Deployment](METRICS_DEPLOYMENT.md))
 - **HPC**: SLURM metrics export script (see [Monitoring Setup](MONITORING_SETUP.md))
 - **Prometheus/Grafana**: Pull metrics from Cloudflare Worker endpoint
 - **SLURM**: `sacct`, `squeue` for job monitoring

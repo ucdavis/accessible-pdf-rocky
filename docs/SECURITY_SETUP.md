@@ -1,12 +1,12 @@
 # Security Setup Guide
 
-This document describes the security hardening for FastAPI → HPC SLURM integration using restricted SSH commands.
+This document describes the security hardening for .NET API → HPC SLURM integration using restricted SSH commands.
 
 ## Overview
 
-**Security Goal**: FastAPI should only be able to submit SLURM jobs — nothing else.
+**Security Goal**: .NET API should only be able to submit SLURM jobs — nothing else.
 
-Even if FastAPI is compromised, attackers cannot:
+Even if .NET API is compromised, attackers cannot:
 
 - Run arbitrary commands on HPC
 - Access user data
@@ -17,7 +17,7 @@ Even if FastAPI is compromised, attackers cannot:
 ## Architecture
 
 ```
-FastAPI Controller → Restricted SSH Key → Forced Command Wrapper → sbatch only
+.NET API Controller → Restricted SSH Key → Forced Command Wrapper → sbatch only
 ```
 
 ## Implementation
@@ -42,7 +42,7 @@ This user:
 
 ```bash
 # Copy wrapper script to system location
-sudo cp controller/hpc/scripts/slurm_sbatch_wrapper.sh /usr/local/bin/
+sudo cp server/hpc/scripts/slurm_sbatch_wrapper.sh /usr/local/bin/
 sudo chmod 755 /usr/local/bin/slurm_sbatch_wrapper.sh
 sudo chown root:root /usr/local/bin/slurm_sbatch_wrapper.sh
 ```
@@ -54,11 +54,11 @@ The wrapper script (`/usr/local/bin/slurm_sbatch_wrapper.sh`):
 - Prevents argument injection
 - Only executes `sbatch` — nothing else
 
-### Step 3: Generate SSH Key for FastAPI
+### Step 3: Generate SSH Key for .NET API
 
 ```bash
-# On FastAPI server (or wherever controller runs)
-ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_slurm_submit -C "fastapi-slurm-submit"
+# On .NET API server (or wherever controller runs)
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_slurm_submit -C "dotnet-slurm-submit"
 ```
 
 **Important**:
@@ -82,7 +82,7 @@ chmod 600 ~/.ssh/authorized_keys
 Add to `~slurm_submit/.ssh/authorized_keys`:
 
 ```
-command="/usr/local/bin/slurm_sbatch_wrapper.sh",no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding ssh-ed25519 AAAA... fastapi-slurm-submit
+command="/usr/local/bin/slurm_sbatch_wrapper.sh",no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding ssh-ed25519 AAAA... dotnet-slurm-submit
 ```
 
 **Key restrictions:**
@@ -93,14 +93,14 @@ command="/usr/local/bin/slurm_sbatch_wrapper.sh",no-agent-forwarding,no-port-for
 - `no-pty` — Prevents interactive terminal
 - `no-X11-forwarding` — Prevents X11 forwarding
 
-### Step 5: Configure FastAPI Environment
+### Step 5: Configure .NET API Environment
 
 ```bash
-# On FastAPI server, create .env file
-cat >> controller/.env <<EOF
+# On .NET API server, create .env file
+cat >> server/.env <<EOF
 SLURM_HOST=hpc-login.ucdavis.edu
 SLURM_USER=slurm_submit
-SLURM_SSH_KEY_PATH=/home/controller/.ssh/id_ed25519_slurm_submit
+SLURM_SSH_KEY_PATH=/home/server/.ssh/id_ed25519_slurm_submit
 SLURM_REMOTE_SCRIPT_DIR=/home/slurm_submit/jobs
 EOF
 ```
@@ -108,7 +108,7 @@ EOF
 ### Step 6: Test the Setup
 
 ```bash
-# From FastAPI server, test SSH connection
+# From .NET API server, test SSH connection
 ssh -i ~/.ssh/id_ed25519_slurm_submit slurm_submit@hpc-login.ucdavis.edu /home/slurm_submit/jobs/test.sh
 ```
 
@@ -122,12 +122,12 @@ Expected behavior:
 
 ```bash
 # On HPC login node
-sudo cp controller/hpc/scripts/job.sh /home/slurm_submit/jobs/job_template.sh
+sudo cp server/hpc/scripts/job.sh /home/slurm_submit/jobs/job_template.sh
 sudo chown slurm_submit:slurm_submit /home/slurm_submit/jobs/job_template.sh
 sudo chmod 755 /home/slurm_submit/jobs/job_template.sh
 ```
 
-FastAPI will:
+.NET API will:
 
 1. Generate job-specific script with environment variables
 2. Upload via SFTP to `/home/slurm_submit/jobs/job_<uuid>.sh`
@@ -198,14 +198,14 @@ Rotate SSH keys every 90 days:
 ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_slurm_submit_new
 
 # 2. Add new key to authorized_keys (keep old key)
-# 3. Update FastAPI environment to use new key
+# 3. Update .NET API environment to use new key
 # 4. Monitor for 24 hours
 # 5. Remove old key from authorized_keys
 ```
 
 ## Incident Response
 
-If FastAPI is compromised:
+If .NET API is compromised:
 
 1. **Immediately revoke SSH key**:
 
@@ -237,7 +237,7 @@ If FastAPI is compromised:
 
 ## Benefits of This Approach
 
-✅ **Principle of Least Privilege**: FastAPI can only submit jobs, nothing else
+✅ **Principle of Least Privilege**: .NET API can only submit jobs, nothing else
 
 ✅ **Defense in Depth**: Multiple validation layers (SSH restrictions + wrapper validation)
 

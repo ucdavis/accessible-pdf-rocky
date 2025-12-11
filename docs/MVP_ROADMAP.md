@@ -27,15 +27,15 @@ A working end-to-end flow where:
 
 All MVP work is tracked in GitHub Issues with the `MVP v0.1` milestone:
 
-- **Issue #1**: Frontend PDF upload UI
+- **Issue #1**: React client PDF upload UI
 - **Issue #2**: Cloudflare R2 storage integration
 - **Issue #3**: Cloudflare Queue for job submission
 - **Issue #4**: Database setup (D1 API Worker)
-- **Issue #5**: FastAPI controller queue listener
-- **Issue #6**: SLURM job submission from controller
+- **Issue #5**: .NET API queue listener
+- **Issue #6**: SLURM job submission from .NET API
 - **Issue #7**: Basic PDF analysis (mock implementation)
 - **Issue #8**: Job status API endpoint
-- **Issue #9**: Frontend status polling and results display
+- **Issue #9**: React client status polling and results display
 - **Issue #10**: End-to-end integration test
 
 View milestone: <https://github.com/ucdavis/accessible-pdf-rocky/milestone/1>
@@ -50,8 +50,8 @@ View milestone: <https://github.com/ucdavis/accessible-pdf-rocky/milestone/1>
 
 ### Phase 2: Backend Foundation (Issues #5, #6, #8)
 
-1. Implement queue listener in controller
-2. SLURM job submission
+1. Implement queue listener in .NET API
+2. SLURM job submission from .NET API
 3. Status API endpoint
 
 ### Phase 3: Processing (Issue #7)
@@ -60,8 +60,8 @@ View milestone: <https://github.com/ucdavis/accessible-pdf-rocky/milestone/1>
 
 ### Phase 4: Frontend (Issues #1, #9)
 
-1. Upload UI
-2. Status polling and results
+1. React client upload UI
+2. React client status polling and results display
 
 ### Phase 5: Validation (Issue #10)
 

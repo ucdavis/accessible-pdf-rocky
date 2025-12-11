@@ -1,43 +1,73 @@
 services:
-  # FastAPI controller
-  # Note: Requires workers running via wrangler dev:
-  #   - db-api worker on port 8787 (required)
-  #   - metrics-ingest worker on port 8788 (optional)
-  # See docs/DEVELOPMENT.md for setup instructions
-  controller:
-    build:
-      context: ./controller
-      dockerfile: Dockerfile
+  # Cloudflare Worker - Database API
+  db-api:
+    image: node:20
+    working_dir: /app
+    restart: unless-stopped
     ports:
-      - "8000:8000"
-    environment:
-      ENVIRONMENT: ${ENVIRONMENT:-development}
-      DB_API_URL: ${DB_API_URL:-http://localhost:8787}
-      DB_API_TOKEN: ${DB_API_TOKEN:-dev-token}
-      STORAGE_MODE: ${STORAGE_MODE:-local}
-      STORAGE_PATH: ${STORAGE_PATH:-/app/storage}
-      QUEUE_MODE: ${QUEUE_MODE:-direct}
-      METRICS_ENDPOINT: ${METRICS_ENDPOINT:-http://localhost:8788/ingest}
-      METRICS_TOKEN: ${METRICS_TOKEN:-dev-token}
+      - "8787:8787"
     volumes:
-      - ./controller:/app
-      - storage_data:/app/storage
-    command: uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+      - ./workers/db-api:/app
+      - db-api-node-modules:/app/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8787/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: sh -c "test -d node_modules || npm install && npx wrangler dev src/index.ts --port 8787 --ip 0.0.0.0"
 
-  # Next.js frontend
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+  # .NET Server
+  server:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    working_dir: /app
+    restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "5165:5165"
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5165
+      DB_API_URL: http://db-api:8787
+      # NOTE: This dev token is for local development only and must not be used in production.
+      # Use environment variables or secrets management in production.
+      DB_API_TOKEN: dev-token
+      # Metrics are optional - uncomment and add metrics-ingest service if needed
+      # METRICS_ENDPOINT: http://metrics-ingest:8788/ingest
+      # METRICS_TOKEN: dev-token
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
-    command: npm run dev
+      - ./server:/app/server
+      - ./server.core:/app/server.core
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5165/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      db-api:
+        condition: service_healthy
+    command: dotnet watch --project /app/server/server.csproj
+
+  # React/Vite Client
+  client:
+    image: node:20
+    working_dir: /app
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://server:5165}
+    volumes:
+      - ./client:/app
+      - client-node-modules:/app/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5173 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      server:
+        condition: service_healthy
+    command: sh -c "test -d node_modules || npm install && npm run dev -- --host 0.0.0.0"
 
 volumes:
-  storage_data:
+  db-api-node-modules:
+  client-node-modules:
