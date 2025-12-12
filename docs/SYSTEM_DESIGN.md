@@ -1,12 +1,34 @@
 # System Design
 
-This document describes the AI-powered PDF accessibility conversion pipeline, model selection, and processing architecture.
+This document covers both:
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for infrastructure and deployment details.
+- the **current implementation** in this repository, and
+- the **target system design** (planned) for the full AI-powered PDF accessibility pipeline.
 
-## Overview
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for repository structure and deployment details.
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for local development.
+See [SECURITY_SETUP.md](./SECURITY_SETUP.md) for secrets and token-based auth.
+See [MONITORING_SETUP.md](./MONITORING_SETUP.md) and [METRICS_DEPLOYMENT.md](./METRICS_DEPLOYMENT.md) for metrics.
 
-The system converts arbitrary PDFs into WCAG 2.1/UA-compliant accessible PDFs through a multi-stage AI-powered pipeline:
+## Current implementation (what exists today)
+
+Implemented:
+
+- `.NET` server endpoints:
+  - `GET /api/job` (list jobs)
+  - `GET /api/job/status/{jobId}` (job status)
+- `workers/db-api` provides the D1-backed REST API used by the server.
+- `workers/metrics-ingest` stores metric points in D1 and exposes `GET /metrics` for Prometheus.
+
+In progress / planned (not end-to-end yet):
+
+- Upload → R2 → Queue → orchestrator/SLURM → results flow.
+- Complete the `hpc_runner` processing pipeline and accessible PDF reconstruction (currently scaffold/TODO).
+- End-user authentication and UI for review/editing.
+
+## Target Overview (planned)
+
+The target system converts arbitrary PDFs into WCAG 2.1/UA-compliant accessible PDFs through a multi-stage AI-powered pipeline:
 
 1. **PDF Analysis** - Parse structure, detect type (digital/scanned/hybrid)
 2. **AI Inference** - Layout detection, role classification, content understanding
@@ -317,35 +339,36 @@ flowchart LR
 
 ### Two-Layer Orchestration
 
-**Layer 1: .NET API Server (Cloudflare ↔ HPC ↔ [R2](https://developers.cloudflare.com/r2/) Flow)**
+**Layer 1: .NET API Server (current + planned)**
 
-The `.NET API server/Services/` layer orchestrates job flow between components:
+Current responsibilities in this repo:
 
-- Pulls jobs from [Cloudflare Queue](https://developers.cloudflare.com/queues/)
-- Downloads PDFs from [R2](https://developers.cloudflare.com/r2/)
-- Submits [SLURM](https://slurm.schedmd.com/) jobs to HPC
-- Monitors job status
-- Retrieves results
-- Uploads to [R2](https://developers.cloudflare.com/r2/)
-- Updates database
+- Provide job APIs for the browser client (`GET /api/job`, `GET /api/job/status/{jobId}`).
+- Call `workers/db-api` for job metadata (D1) over HTTP + bearer token.
+- Optionally push operational metrics to `workers/metrics-ingest` (if `METRICS_TOKEN` is configured).
 
-**Layer 2: HPC Runner (ML Pipeline on GPU)**
+Planned responsibilities (not wired end-to-end yet):
 
-The `hpc_runner/` layer orchestrates heavy ML processing:
+- Pull jobs from [Cloudflare Queue](https://developers.cloudflare.com/queues/).
+- Download PDFs from [R2](https://developers.cloudflare.com/r2/).
+- Submit [SLURM](https://slurm.schedmd.com/) jobs to HPC.
+- Monitor job status, upload results to R2, and update the database.
 
-- Loads GPU models ([LayoutLMv3](https://huggingface.co/docs/transformers/model_doc/layoutlmv3), [BLIP-2](https://huggingface.co/docs/transformers/model_doc/blip-2), [TAPAS](https://huggingface.co/docs/transformers/model_doc/tapas))
-- Runs layout detection
-- Generates alt-text
-- Parses tables
-- Outputs results
+**Layer 2: HPC Runner (ML pipeline on GPU) (scaffold + planned)**
+
+The `hpc_runner/` package contains the intended structure of the ML pipeline (`ai/` and `processors/`). Today, `hpc_runner/runner.py` is still largely a placeholder, but the planned responsibilities are:
+
+- Load GPU models ([LayoutLMv3](https://huggingface.co/docs/transformers/model_doc/layoutlmv3), [BLIP-2](https://huggingface.co/docs/transformers/model_doc/blip-2), [TAPAS](https://huggingface.co/docs/transformers/model_doc/tapas)).
+- Run layout detection, reading order, alt-text generation, and table parsing.
+- Apply WCAG rules and construct a tagged (accessible) PDF.
 
 ### .NET 10 Web API Job Pipeline (Conceptual)
 
 ```csharp
-// Conceptual - Current implementation focuses on orchestration
+// Conceptual (planned). Current server implementation is limited to job status/list + db-api integration.
 // Heavy processing happens in hpc_runner (Python)
 public async Task<(string outputPdf, Report report)> ProcessPdfJobAsync(
-    string jobId, 
+    Guid jobId,
     string pdfPath)
 {
     // Orchestrate Cloudflare ↔ HPC ↔ R2 flow
@@ -361,7 +384,7 @@ public async Task<(string outputPdf, Report report)> ProcessPdfJobAsync(
     await MonitorSlurmJobAsync(slurmId);
     
     // 4. Update database status
-    await _dbClient.UpdateJobStatusAsync(jobId, "completed", null);
+    await _dbClient.UpdateJobAsync(jobId, status: JobStatus.Completed, resultsUrl: null);
     
     // 5. Generate report (from HPC results)
     var report = await GenerateComplianceReportAsync(jobId);
@@ -404,7 +427,7 @@ def analyze_pdf(pdf_path: str, job_id: str) -> dict:
 
 ### Service Layer Organization (.NET API Server)
 
-Runs on [.NET 10 Web API](https://learn.microsoft.com/en-us/aspnet/core/web-api/) server, orchestrates Cloudflare ↔ HPC ↔ [R2](https://developers.cloudflare.com/r2/):
+Runs on [.NET Web API](https://learn.microsoft.com/en-us/aspnet/core/web-api/). Today it primarily exposes job APIs and calls `workers/db-api`; orchestration of Cloudflare ↔ HPC ↔ R2 is planned:
 
 ```
 server/Services/
@@ -418,7 +441,7 @@ server/Controllers/
 
 ### AI Inference Layer (HPC GPU Nodes)
 
-Runs on HPC GPU nodes via [SLURM](https://slurm.schedmd.com/), performs heavy ML:
+Intended to run on HPC GPU nodes via [SLURM](https://slurm.schedmd.com/) (planned), performs heavy ML:
 
 ```
 hpc_runner/
@@ -553,68 +576,23 @@ def analyze_pdf(pdf_path, job_id):
 
 This separation keeps ML model concerns separate from business logic and makes the codebase more maintainable.
 
-### Addressing Naming Overlap: .NET API services vs hpc_runner
+### Separation of concerns: server vs hpc_runner
 
-**Important:** You'll notice similar file names in `.NET API services/` and `hpc_runner/` (e.g., `ocr_engine.py`, `wcag.py`). This overlap is **intentional** and serves different purposes:
+The server and `hpc_runner/` operate in the same problem domain (OCR, WCAG, tagged PDFs), but they run in different environments and have different responsibilities.
 
-#### Runtime Environments
+#### Runtime environments
 
 | Layer | Where | Resources | Purpose |
-|-------|-------|-----------|----------|
-| `.NET API services/` | .NET 10 Web API server (VM) | CPU only, lightweight | Orchestrate Cloudflare ↔ HPC ↔ R2 flow |
-| `hpc_runner/` | HPC GPU nodes | A100/H100 GPUs, 10s GB RAM | Heavy ML processing |
+|-------|-------|-----------|---------|
+| `server/` | .NET Web API (VM/container) | CPU only, lightweight | API for the client + orchestration glue (planned) |
+| `hpc_runner/` | HPC GPU nodes (via SLURM, planned) | GPU/CPU, high memory | Compute-heavy processing and accessible PDF reconstruction |
 
-#### Why Similar Names?
+#### Notes on current repo state
 
-These layers handle the **same domain** (OCR, WCAG, PDF) but at **different stages** with **different responsibilities**:
+- Today there is no separate OCR/WCAG/PDF processing implementation in `server/`; those concerns live under `hpc_runner/processors/*` (still incomplete/TODO).
+- The server currently focuses on job metadata via `workers/db-api` and (optionally) pushing metrics.
 
-**Pattern:** Controller generates URLs and submits → HPC downloads, processes, and uploads → Controller updates status
-
-#### Detailed Overlap Explanation
-
-**1. OCR Processing**
-
-`.NET API services/ocr_engine.py`:
-
-- Can analyze PDF metadata before submission
-- Helps determine job parameters
-- Lightweight decision logic only
-
-`hpc_runner/processors/ocr.py`:
-
-- Actually runs Tesseract/PaddleOCR on GPU
-- Heavy image processing
-- Returns extracted text
-
-**2. WCAG Validation**
-
-`.NET API services/wcag_engine.py`:
-
-- May provide validation utilities for API responses
-- Helper functions for status reporting
-
-`hpc_runner/processors/wcag.py`:
-
-- Validates during ML processing
-- "Does this layout meet WCAG?"
-- Checks ML predictions against rules
-- Enforces compliance during PDF generation
-
-**3. PDF Operations**
-
-`.NET API services/pdf_builder.py`:
-
-- May provide utility functions
-- No longer builds final PDFs
-
-`hpc_runner/processors/tagging.py`:
-
-- Adds semantic tags during processing
-- Tags headings, paragraphs, figures
-- Builds complete accessible PDF
-- Heavy PDF manipulation with [PyMuPDF](https://pymupdf.readthedocs.io/)
-
-#### Complete Processing Flow
+#### Complete processing flow (planned)
 
 ```mermaid
 flowchart TD
@@ -649,24 +627,37 @@ flowchart TD
     style C2 fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
 ```
 
-**Summary:** Controller generates presigned URLs and submits jobs. HPC downloads input, performs all ML processing, and uploads results directly to R2. Controller only tracks job status and updates database.
+**Summary:** This diagram describes the target end-to-end flow; it is not fully wired up yet in this repository.
 
 ## Frontend Features
 
 ### Authentication
 
-- **Required:** UC Davis campus account login via EntraID (Microsoft Azure AD)
-- All features require authenticated session
+Current:
 
-### Pages
+- No end-user authentication yet (client uses CORS to call the server).
+- Internal service-to-service calls use bearer tokens (workers).
 
-- `/` - Landing page (login redirect if unauthenticated)
-- `/upload` - PDF upload with drag-and-drop
+Planned:
+
+- UC Davis campus account login via EntraID (Microsoft Azure AD).
+
+### Pages / routes
+
+Current routes in `client/src/routes/`:
+
+- `/` - Home
+- `/upload` - Upload page (UI stub; not wired end-to-end yet)
+- `/jobs` - Job list
+- `/jobs/:jobId` - Job details + status polling
+
+Planned pages:
+
 - `/documents/[id]` - Document dashboard
 - `/documents/[id]/review` - Accessibility review editor
 - `/reports/[id]` - Compliance report viewer
 
-### Key Components
+### Key Components (planned)
 
 #### 1. PDF Preview with Structure Overlay
 
@@ -862,6 +853,8 @@ See `workers/db-api/README.md` for API documentation.
 
 ### Object Storage (R2/S3)
 
+Planned key layout (example):
+
 ```
 /uploads/{job_id}/original.pdf      # Original upload
 /processing/{job_id}/ocr.json       # OCR results
@@ -870,6 +863,10 @@ See `workers/db-api/README.md` for API documentation.
 /outputs/{job_id}/accessible.pdf    # Final output
 /reports/{job_id}/compliance.json   # WCAG report
 ```
+
+Current prototype note:
+
+- `workers/api/upload.ts` writes uploads to `raw/{jobId}.pdf` and publishes `{ jobId, r2Key }` to a queue.
 
 ### Optional Box Integration
 
@@ -882,6 +879,8 @@ See `workers/db-api/README.md` for API documentation.
 - Falls back to R2 download if Box integration not enabled
 
 ## Model Training Pipeline
+
+This section is an outline / example. The `scripts/`, `data/`, and `models/` directories referenced below are not currently tracked in this repository.
 
 ### 1. Dataset Preparation
 
@@ -930,14 +929,23 @@ python scripts/benchmark.py \
 
 ## Security & Privacy
 
-- **Authentication** - UC Davis campus account required (EntraID/Azure AD integration)
-- **Authorization** - Users can only access their own jobs and results
-- **PDF sanitization** - Remove embedded scripts, forms, JavaScript
-- **Content isolation** - Each job in separate container
-- **PII detection** - Flag sensitive content (SSN, credit cards)
-- **Access control** - Signed URLs with expiration
-- **Audit logging** - All AI decisions logged for review
-- **Box integration** - Optional, user-controlled OAuth with write permissions
+Current (implemented):
+
+- No end-user authentication yet.
+- `workers/db-api` is protected by a bearer token (`DB_AUTH_TOKEN` on the worker; `DB_API_TOKEN` on the server).
+- `workers/metrics-ingest` requires a bearer token for `POST /ingest` (`METRICS_AUTH_TOKEN` on the worker; server uses `METRICS_TOKEN`), while `GET /metrics` is public for Prometheus scraping.
+- Secrets are provided via environment variables / Worker secrets (not committed).
+
+Planned (target):
+
+- **Authentication**: UC Davis campus account login via EntraID/Azure AD.
+- **Authorization**: Users can only access their own jobs and results.
+- **PDF sanitization**: Remove embedded scripts, forms, JavaScript.
+- **Content isolation**: Each job in a separate container/job allocation.
+- **PII detection**: Flag sensitive content (SSN, credit cards).
+- **Access control**: Signed URLs with expiration for artifacts.
+- **Audit logging**: All AI decisions logged for review.
+- **Box integration**: Optional, user-controlled OAuth with write permissions.
 
 ## Future Enhancements
 

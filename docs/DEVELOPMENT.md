@@ -29,22 +29,26 @@ flowchart LR
 flowchart LR
     A[User] --> B[React + Vite<br/>localhost:5173]
     B --> C[.NET 10 API<br/>localhost:5165]
-    C --> D[Local FS]
-    C --> E[D1 API Worker<br/>localhost:8787]
+    C --> D[D1 API Worker (db-api)<br/>localhost:8787]
     
     style B fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
     style C fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
-    style E fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
+    style D fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
 ```
 
-**Key differences:**
+**Key differences (today):**
 
-- Frontend talks directly to .NET API (no Workers layer)
-- Local filesystem instead of R2
-- Direct processing instead of Cloudflare Queues
-- No SLURM (runs ML locally or mocks it)
+- Frontend talks directly to the .NET API (no Cloudflare Workers layer in front)
+- The database runs locally via `wrangler dev` (D1 backed by SQLite)
+- R2 + Queues + SLURM/HPC are part of the target architecture, but not wired into the end-to-end local workflow yet
 
 ## Quick Start
+
+### Option 0: Dev Container (VS Code / Codespaces)
+
+If you use VS Code or Codespaces, you can develop inside the repo's Dev Container for a consistent toolchain (Node, .NET, Python/uv).
+
+See [.devcontainer/README.md](../.devcontainer/README.md).
 
 ### Option 1: Docker Compose (Recommended)
 
@@ -125,24 +129,28 @@ npx wrangler dev --port 8788  # Start on port 8788 to avoid conflict with db-api
 
 ## Environment Configuration
 
-### Server (.env)
+### Server (`server/.env`) (optional)
 
-Create `server/.env`:
+The server already has reasonable defaults for local development in `server/appsettings.Development.json`.
+
+Create `server/.env` only if you want to override those defaults:
 
 ```bash
 ASPNETCORE_ENVIRONMENT=Development
-DatabaseApi__BaseUrl=http://localhost:8787
-DatabaseApi__Token=dev-token
-Metrics__Endpoint=http://localhost:8788/ingest
-Metrics__Token=dev-token
+DB_API_URL=http://localhost:8787
+DB_API_TOKEN=dev-token
+
+# Optional metrics ingest worker
+METRICS_ENDPOINT=http://localhost:8788/ingest
+METRICS_TOKEN=dev-token
 ```
 
 **Configuration:**
 
-- `DatabaseApi__BaseUrl` - URL for D1 API Worker
-- `DatabaseApi__Token` - Authentication token for D1 API
-- `Metrics__Endpoint` - URL for metrics collection (optional)
-- `Metrics__Token` - Authentication token for metrics
+- `DB_API_URL` - Base URL for the Database API Worker (`workers/db-api`)
+- `DB_API_TOKEN` - Auth token (must match the Worker's `DB_AUTH_TOKEN`)
+- `METRICS_ENDPOINT` - Metrics ingest endpoint (optional)
+- `METRICS_TOKEN` - Metrics ingest token (optional)
 
 ### Client (.env)
 
@@ -150,16 +158,10 @@ The client can be configured in two ways:
 
 **Option 1: Use Vite proxy (recommended for development)**
 
-No `.env` file needed. Vite automatically proxies `/api/*` requests to the .NET server:
+No `client/.env` file needed. The Vite dev server proxies `/api/*` to the .NET server (see `client/vite.config.ts`).
 
-```typescript
-// vite.config.ts already configured:
-proxy: {
-  '^/api': {
-    target: 'http://localhost:5165',
-  },
-}
-```
+- Locally (no Docker): the proxy target defaults to `http://localhost:5165`.
+- In Docker: the proxy runs inside the container, so set `ASPNETCORE_URLS=http://server:5165` in the environment where Vite runs.
 
 **Option 2: Direct API access**
 
@@ -169,28 +171,37 @@ Create `client/.env`:
 VITE_API_URL=http://localhost:5165/api
 ```
 
-**Note:** The `/api` prefix is required because the .NET API controller routes are mounted at `/api/job/...`. The client code defaults to `/api` if `VITE_API_URL` is not set, which works with the Vite proxy in development.
+**Notes:**
+
+- The `/api` prefix is required because the .NET API routes are mounted at `/api/job/...`.
+- When using Docker Compose, `http://server:5165` is not reachable from your browser (it's a Docker service name). Use `http://localhost:5165/api` instead.
 
 ## Testing Cloudflare Workers Locally
 
-[Cloudflare Workers](https://developers.cloudflare.com/workers/) provides `wrangler dev` for local testing:
+This repo contains multiple Workers packages:
+
+- `workers/` - Edge API Worker (R2 + Queues; not part of the end-to-end local workflow yet)
+- `workers/db-api/` - Database API Worker (D1) used by the .NET server
+- `workers/metrics-ingest/` - Metrics ingest Worker (optional)
+
+### Run the Edge API Worker
 
 ```bash
 cd workers
-npm run dev
-# or
-npx wrangler dev
+npm install
+npm run dev -- --port 8790
 ```
 
-This starts a local Workers runtime on port 8787.
+### Run the Database API Worker
 
-**Note:** This still doesn't emulate:
+```bash
+cd workers/db-api
+npm install
+npm run db:migrate:local
+npm run dev  # defaults to port 8787
+```
 
-- R2 (use Miniflare with local storage)
-- Queues (use local queue implementation)
-- Full edge behavior
-
-For full Cloudflare testing, deploy to a preview environment.
+If you see port conflicts, run one of the Workers on a different port (e.g. `--port 8790`).
 
 ## Database Setup
 
@@ -217,11 +228,18 @@ npm run db:migrate:local
 
 ### Remote (Production) Migrations
 
-After updating `schema.sql`, apply to production:
+After updating `schema.sql`, apply to production (requires Cloudflare credentials):
 
 ```bash
 cd workers/db-api
-npm run db:migrate:remote  # Requires Cloudflare credentials
+npm run db:migrate
+```
+
+For metrics:
+
+```bash
+cd workers/metrics-ingest
+npm run db:migrate
 ```
 
 ### Reset Local Database
@@ -266,8 +284,9 @@ just dev-logs
 
 Local:
 
-- Client: Check terminal
-- Server: Check terminal or `server/logs/`
+- Client: check the terminal running Vite
+- Server: check the terminal running `dotnet watch`
+- Workers: check the terminal running `wrangler dev`
 
 ## API Development
 
@@ -365,9 +384,8 @@ just dev-up
 
 - Hot reload enabled
 - Debug logging
-- No authentication
-- Mock services (Queue, R2)
-- Local filesystem storage
+- Local Workers + local D1 (SQLite) via `wrangler dev`
+- Uses development tokens (e.g. `dev-token`) for Worker/API authentication
 
 ### Production Mode
 
@@ -382,75 +400,17 @@ just dev-up
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for production deployment.
 
-## Cloudflare Services Emulation
+## Cloudflare Services (Local vs Planned)
 
-### R2 Storage
+Local development currently focuses on:
 
-**Option 1: Local filesystem (current)**
+- The D1-backed Database API Worker (`workers/db-api`)
+- The .NET API (`server/`) that talks to the Database API
+- The React client (`client/`) that talks to the .NET API
 
-```bash
-# Server uses local files (configured in appsettings)
-Storage__Mode=local
-```
+The R2 + Queues parts of the target architecture exist under `workers/`, but are not wired into the end-to-end local workflow yet (the Upload UI is still stubbed).
 
-**Option 2: MinIO (S3-compatible)**
-
-```yaml
-# docker-compose.yml
-services:
-  minio:
-    image: minio/minio
-    ports:
-      - "9000:9000"
-    command: server /data
-```
-
-**Option 3: Use actual R2 (with test bucket)**
-
-```bash
-STORAGE_MODE=r2
-R2_ACCOUNT_ID=your-account
-R2_ACCESS_KEY_ID=your-key
-R2_SECRET_ACCESS_KEY=your-secret
-```
-
-### Cloudflare Queues
-
-**Option 2: Direct execution (current)**
-
-```bash
-# Skip queue, call handler directly
-Queue__Mode=direct
-```
-
-**Option 2: Redis queue**
-
-```yaml
-services:
-  redis:
-    image: redis:alpine
-```
-
-**Option 3: Use actual Cloudflare Queues (preview)**
-
-```bash
-wrangler queues create pdf-jobs --env preview
-```
-
-### [Cloudflare Workers](https://developers.cloudflare.com/workers/)
-
-**Use `wrangler dev`:**
-
-```bash
-cd workers
-npx wrangler dev
-```
-
-**Or deploy to preview:**
-
-```bash
-npx wrangler deploy --env preview
-```
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for the target production design.
 
 ## Tips
 
@@ -463,8 +423,20 @@ npx wrangler deploy --env preview
 
 ## Next Steps
 
-1. Set up `.env` files (see above)
-2. Run `just dev` to start everything
-3. Open <http://localhost:5173>
-4. Upload a test PDF
-5. Check API docs at <http://localhost:5165/swagger>
+1. Run `just setup`
+2. Start the stack:
+   - Docker: `just dev`
+   - Local: `just dev-client` and `just dev-server` (and `workers/db-api`)
+3. Open <http://localhost:5173/jobs>
+4. Seed a job into the local database (so the UI has something to show):
+
+```bash
+JOB_ID="$(uuidgen)"
+
+curl -X POST http://localhost:8787/jobs \
+  -H 'Authorization: Bearer dev-token' \
+  -H 'Content-Type: application/json' \
+  -d "{\"id\":\"$JOB_ID\",\"r2_key\":\"local/example.pdf\",\"status\":\"submitted\"}"
+```
+
+1. Check API docs at <http://localhost:5165/swagger>

@@ -203,6 +203,7 @@
     "unstub",
     "untagged",
     "userosscache",
+    "uuidgen",
     "uvicorn",
     "VARCHAR",
     "venv",

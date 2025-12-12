@@ -1,254 +1,105 @@
 # Security Setup Guide
 
-This document describes the security hardening for .NET API → HPC SLURM integration using restricted SSH commands.
+This document describes the security model for the **current** `accessible-pdf-rocky` repository.
 
-## Overview
+The target architecture includes HPC/SLURM integration, but this repo does not yet contain any SSH/SLURM submission code or hardening scripts. Security guidance here focuses on what exists today: the .NET server and Cloudflare Workers.
 
-**Security Goal**: .NET API should only be able to submit SLURM jobs — nothing else.
+## Current security model (repo today)
 
-Even if .NET API is compromised, attackers cannot:
+- **End-user authentication/authorization**: not implemented yet.
+- **Database access**: protected behind a token-authenticated Worker (`workers/db-api`).
+- **Metrics ingestion**: token-authenticated (`workers/metrics-ingest`), but the Prometheus scrape endpoint (`GET /metrics`) is public.
+- **Secrets**: expected to be provided via environment variables and Cloudflare Worker secrets (not committed to git).
 
-- Run arbitrary commands on HPC
-- Access user data
-- Spawn shells
-- Port forward or tunnel
-- Access other HPC resources
+## Secrets and sensitive configuration
 
-## Architecture
+### Database API Worker (`workers/db-api`)
 
-```
-.NET API Controller → Restricted SSH Key → Forced Command Wrapper → sbatch only
-```
+- `DB_AUTH_TOKEN` (Cloudflare Worker secret)
+  - Used by: `workers/db-api`
+  - Required for: all endpoints except `GET /health`
+  - How to set (Cloudflare):
 
-## Implementation
+    ```bash
+    cd workers/db-api
+    npx wrangler secret put DB_AUTH_TOKEN
+    ```
 
-### Step 1: Create Restricted User on HPC Login Node
+- `DB_API_URL` and `DB_API_TOKEN` (server configuration)
+  - Used by: `server/` (`DatabaseApiClient`)
+  - `DB_API_TOKEN` must match the Worker's `DB_AUTH_TOKEN`.
+  - Example (local override): see `server/.env.example`.
 
-```bash
-# On HPC login node (as root)
-sudo useradd -m slurm_submit
-sudo mkdir -p /home/slurm_submit/jobs
-sudo chown slurm_submit:slurm_submit /home/slurm_submit/jobs
-sudo chmod 700 /home/slurm_submit/jobs
-```
+### Metrics ingest Worker (`workers/metrics-ingest`)
 
-This user:
+- `METRICS_AUTH_TOKEN` (Cloudflare Worker secret)
+  - Used by: `workers/metrics-ingest`
+  - Required for: `POST /ingest`
+  - How to set (Cloudflare):
 
-- Has a home directory
-- Has a dedicated jobs directory
-- Cannot login interactively (no shell access via normal means)
+    ```bash
+    cd workers/metrics-ingest
+    npx wrangler secret put METRICS_AUTH_TOKEN
+    ```
 
-### Step 2: Install Command Wrapper
+- `METRICS_ENDPOINT` and `METRICS_TOKEN` (push clients)
+  - Used by: the .NET server's `MetricsClient` (if you wire it into server logic) and any HPC cron script.
+  - `METRICS_TOKEN` must match the Worker's `METRICS_AUTH_TOKEN`.
+  - Note: if `METRICS_TOKEN` is empty, the .NET `MetricsClient` skips pushing metrics.
 
-```bash
-# Copy wrapper script to system location
-sudo cp server/hpc/scripts/slurm_sbatch_wrapper.sh /usr/local/bin/
-sudo chmod 755 /usr/local/bin/slurm_sbatch_wrapper.sh
-sudo chown root:root /usr/local/bin/slurm_sbatch_wrapper.sh
-```
+### CORS / allowed origins
 
-The wrapper script (`/usr/local/bin/slurm_sbatch_wrapper.sh`):
+- `.NET server`:
+  - Configure `Cors:AllowedOrigins` (see `server/appsettings.Production.json`).
+- Workers (`workers/db-api`, `workers/metrics-ingest`):
+  - Optional `ALLOWED_ORIGIN` variable controls `Access-Control-Allow-Origin` (defaults to `*`).
+  - In production, set `ALLOWED_ORIGIN` to the specific origin(s) you expect.
 
-- Validates script path is in `/home/slurm_submit/jobs/`
-- Prevents path traversal attacks
-- Prevents argument injection
-- Only executes `sbatch` — nothing else
+## Files that must never be committed
 
-### Step 3: Generate SSH Key for .NET API
+These are already ignored by git (see `../.gitignore`), but treat them as sensitive:
 
-```bash
-# On .NET API server (or wherever controller runs)
-ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_slurm_submit -C "dotnet-slurm-submit"
-```
+- `.env`, `.env.*`
+- `*.pem` and other private keys
 
-**Important**:
+Use `server/.env.example` as a starting point for local configuration.
 
-- Use ed25519 (modern, secure, fast)
-- Store private key securely
-- Set in environment variable: `SLURM_SSH_KEY_PATH=/path/to/id_ed25519_slurm_submit`
-- Never commit private key to git
+## Local development defaults
 
-### Step 4: Install Public Key with Forced Command
+Local/dev convenience settings are not production-safe:
 
-```bash
-# On HPC login node
-sudo su - slurm_submit
-mkdir -p ~/.ssh
-chmod 700 ~/.ssh
-touch ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
-```
+- Docker/Dev Container flows commonly use `dev-token`.
+- Do not reuse `dev-token` in any real environment.
 
-Add to `~slurm_submit/.ssh/authorized_keys`:
+## Production hardening checklist (before exposure)
 
-```
-command="/usr/local/bin/slurm_sbatch_wrapper.sh",no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding ssh-ed25519 AAAA... dotnet-slurm-submit
-```
+1. Replace all dev tokens with strong random tokens (e.g. `openssl rand -base64 32`).
+2. Restrict CORS:
+   - `.NET server`: set `Cors:AllowedOrigins`.
+   - Workers: set `ALLOWED_ORIGIN`.
+3. Decide how to protect public endpoints:
+   - The `.NET server` is currently unauthenticated.
+   - The edge API worker under `workers/api/*` has no auth and must not be treated as production-ready.
+4. Consider whether `GET /metrics` should be public:
+   - It is public by design for Prometheus scraping.
+   - If you need to restrict access, add access control (e.g. Cloudflare Access) or implement auth on the Worker.
+5. Rotate tokens periodically and on incident.
+6. Use CI security tooling:
+   - `just audit` (npm audit + pip-audit)
+   - GitHub workflows include CodeQL and Dependabot.
 
-**Key restrictions:**
+## Incident response (token compromise)
 
-- `command=` — Forces execution of wrapper, ignores SSH command
-- `no-agent-forwarding` — Prevents SSH agent forwarding
-- `no-port-forwarding` — Prevents port tunneling
-- `no-pty` — Prevents interactive terminal
-- `no-X11-forwarding` — Prevents X11 forwarding
+- Rotate the relevant Worker secret and redeploy.
+- Update server/HPC environments to use the new token.
+- Inspect recent Worker logs (`npm run tail` inside the Worker directory) and D1 tables.
 
-### Step 5: Configure .NET API Environment
+## Future: HPC / SLURM hardening
 
-```bash
-# On .NET API server, create .env file
-cat >> server/.env <<EOF
-SLURM_HOST=hpc-login.ucdavis.edu
-SLURM_USER=slurm_submit
-SLURM_SSH_KEY_PATH=/home/server/.ssh/id_ed25519_slurm_submit
-SLURM_REMOTE_SCRIPT_DIR=/home/slurm_submit/jobs
-EOF
-```
-
-### Step 6: Test the Setup
-
-```bash
-# From .NET API server, test SSH connection
-ssh -i ~/.ssh/id_ed25519_slurm_submit slurm_submit@hpc-login.ucdavis.edu /home/slurm_submit/jobs/test.sh
-```
-
-Expected behavior:
-
-- ✅ If script exists in `/home/slurm_submit/jobs/`, it submits to SLURM
-- ❌ If script is elsewhere, it is rejected
-- ❌ Trying to run other commands fails (wrapper always runs)
-
-### Step 7: Create Template Job Script
-
-```bash
-# On HPC login node
-sudo cp server/hpc/scripts/job.sh /home/slurm_submit/jobs/job_template.sh
-sudo chown slurm_submit:slurm_submit /home/slurm_submit/jobs/job_template.sh
-sudo chmod 755 /home/slurm_submit/jobs/job_template.sh
-```
-
-.NET API will:
-
-1. Generate job-specific script with environment variables
-2. Upload via SFTP to `/home/slurm_submit/jobs/job_<uuid>.sh`
-3. Call wrapper via SSH to submit script
-4. Clean up script after submission
-
-## Security Validation
-
-### Test 1: Verify Forced Command
-
-```bash
-# Try to run arbitrary command (should fail)
-ssh -i ~/.ssh/id_ed25519_slurm_submit slurm_submit@hpc-login.ucdavis.edu "ls -la"
-```
-
-Expected: Wrapper rejects with "No script path provided"
-
-### Test 2: Verify Path Validation
-
-```bash
-# Try to submit script outside allowed directory
-ssh -i ~/.ssh/id_ed25519_slurm_submit slurm_submit@hpc-login.ucdavis.edu /tmp/malicious.sh
-```
-
-Expected: "Script not in allowed directory"
-
-### Test 3: Verify No Shell Access
-
-```bash
-# Try to get interactive shell
-ssh -i ~/.ssh/id_ed25519_slurm_submit slurm_submit@hpc-login.ucdavis.edu
-```
-
-Expected: Connection closes immediately (no-pty restriction)
-
-## Monitoring and Alerts
-
-### Failed Authentication Attempts
-
-Monitor `/var/log/auth.log` on HPC login node:
-
-```bash
-# Setup alert for failed SSH attempts
-tail -f /var/log/auth.log | grep "slurm_submit" | grep "Failed"
-```
-
-### Wrapper Script Violations
-
-Monitor wrapper script rejections:
-
-```bash
-# Check for path validation failures
-sudo journalctl -u sshd | grep "slurm_sbatch_wrapper" | grep "ERROR"
-```
-
-### Recommended Alerts
-
-1. **Failed SSH authentication** → Immediate alert
-2. **Path validation failures** → Immediate alert
-3. **Unusual submission patterns** → Warning (e.g. >100 jobs/minute)
-
-## Key Rotation
-
-Rotate SSH keys every 90 days:
-
-```bash
-# 1. Generate new key
-ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_slurm_submit_new
-
-# 2. Add new key to authorized_keys (keep old key)
-# 3. Update .NET API environment to use new key
-# 4. Monitor for 24 hours
-# 5. Remove old key from authorized_keys
-```
-
-## Incident Response
-
-If .NET API is compromised:
-
-1. **Immediately revoke SSH key**:
-
-   ```bash
-   sudo su - slurm_submit
-   # Remove compromised key from ~/.ssh/authorized_keys
-   ```
-
-2. **Check for malicious jobs**:
-
-   ```bash
-   squeue -u slurm_submit
-   sacct -u slurm_submit --starttime now-7days
-   ```
-
-3. **Audit submitted scripts**:
-
-   ```bash
-   ls -lat /home/slurm_submit/jobs/
-   ```
-
-4. **Cancel suspicious jobs**:
-
-   ```bash
-   scancel -u slurm_submit
-   ```
-
-5. **Generate new key and re-deploy**
-
-## Benefits of This Approach
-
-✅ **Principle of Least Privilege**: .NET API can only submit jobs, nothing else
-
-✅ **Defense in Depth**: Multiple validation layers (SSH restrictions + wrapper validation)
-
-✅ **Auditability**: All submissions logged via SSH and SLURM
-
-✅ **Isolation**: Dedicated user prevents lateral movement
-
-✅ **Revocable**: Single key can be revoked without affecting other systems
+When HPC/SLURM integration is implemented, follow least-privilege patterns (dedicated user, forced-command SSH keys, allowlisted `sbatch`, no-pty/no-port-forwarding, etc.).
 
 ## References
 
-- [OpenSSH authorized_keys](https://man.openbsd.org/sshd.8#AUTHORIZED_KEYS_FILE_FORMAT)
-- [SLURM Security Guide](https://slurm.schedmd.com/security.html)
-- [SSH Hardening](https://www.ssh.com/academy/ssh/sshd_config)
+- `workers/db-api/README.md`
+- `workers/metrics-ingest/README.md`
+- [Metrics Deployment](./METRICS_DEPLOYMENT.md)

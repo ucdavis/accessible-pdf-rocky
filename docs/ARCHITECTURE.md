@@ -93,96 +93,160 @@ flowchart TD
 
 ```text
 accessible-pdf-rocky/
-│
+├── .devcontainer/
+│   ├── dev.Dockerfile
+│   ├── devcontainer.json
+│   ├── docker-compose.yml
+│   ├── README.md
+│   ├── setup.sh
+│   └── wait-for-db-api.sh
 ├── .github/
-│   └── workflows/           # CI/CD workflows
-│       ├── ci.yml
-│       ├── codeql.yml
-│       └── security.yml
-│
-├── client/                   # React 19 + Vite on Cloudflare Pages
+│   ├── workflows/
+│   │   ├── ci.yml
+│   │   ├── codeql.yml
+│   │   └── security.yml
+│   ├── CODEOWNERS
+│   └── dependabot.yml
+├── client/
 │   ├── src/
-│   │   ├── main.tsx          # Application entry point
-│   │   ├── routes/           # TanStack Router file-based routes
-│   │   │   ├── __root.tsx    # Root layout
-│   │   │   ├── index.tsx     # Home page
-│   │   │   ├── upload.tsx    # PDF upload UI
-│   │   │   └── jobs/
-│   │   │       ├── index.tsx          # Jobs list
-│   │   │       └── $jobId.tsx         # Job details with auto-polling
-│   │   ├── components/       # Reusable UI components
-│   │   └── lib/
-│   │       └── api.ts        # API client for .NET endpoints
-│   ├── vite.config.ts        # Vite configuration with API proxy
-│   └── package.json
-│
-├── server/                   # .NET 10 Web API (https://learn.microsoft.com/en-us/aspnet/core/)
-│   ├── Program.cs            # Application entry point
-│   ├── appsettings.json      # Configuration
-│   ├── Controllers/
-│   │   └── JobController.cs  # Job status endpoints
-│   ├── Services/
-│   │   ├── DatabaseApiClient.cs  # Cloudflare D1 API client
-│   │   └── MetricsClient.cs      # Metrics push client
-│   └── server.csproj
-│
-├── server.core/              # Domain models and shared logic
-│   ├── Domain/
-│   │   ├── Job.cs
-│   │   ├── User.cs
-│   │   ├── ProcessingMetric.cs
-│   │   └── JobStatus.cs
-│   └── server.core.csproj
-│
+│   │   ├── lib/
+│   │   │   ├── __tests__/
+│   │   │   │   └── api.test.ts
+│   │   │   └── api.ts
+│   │   ├── routes/
+│   │   │   ├── jobs/
+│   │   │   │   ├── $jobId.tsx
+│   │   │   │   └── index.tsx
+│   │   │   ├── __root.tsx
+│   │   │   ├── index.tsx
+│   │   │   └── upload.tsx
+│   │   ├── test/
+│   │   │   └── setup.ts
+│   │   ├── main.css
+│   │   ├── main.tsx
+│   │   ├── routeTree.gen.ts
+│   │   └── vite-env.d.ts
+│   ├── docker-init.sh
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── vite.config.ts
+│   └── vitest.config.ts
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── DEVELOPMENT.md
+│   ├── METRICS_DEPLOYMENT.md
+│   ├── MONITORING_SETUP.md
 │   ├── MVP_ROADMAP.md
+│   ├── SECURITY_SETUP.md
 │   ├── SYSTEM_DESIGN.md
 │   ├── TESTING.md
 │   └── WHY.md
-│
-│
-├── hpc_runner/               # HPC compute jobs (heavy ML processing)
-│   ├── runner.py             # Main SLURM job script
-│   ├── ai/                   # Low-level ML model wrappers
-│   │   ├── layout/
-│   │   │   ├── model.py      # LayoutLMv3 wrapper
-│   │   │   └── inference.py  # Batch inference
+├── hpc_runner/
+│   ├── ai/
 │   │   ├── alt_text/
-│   │   │   ├── model.py      # BLIP-2/LLaVA wrapper
-│   │   │   └── inference.py  # Image captioning
-│   │   └── tables/
-│   │       ├── model.py      # TAPAS wrapper
-│   │       └── inference.py  # Table parsing
-│   ├── processors/           # High-level business logic
+│   │   │   ├── __init__.py
+│   │   │   ├── inference.py
+│   │   │   └── model.py
+│   │   ├── layout/
+│   │   │   ├── __init__.py
+│   │   │   ├── inference.py
+│   │   │   └── model.py
+│   │   ├── tables/
+│   │   │   ├── __init__.py
+│   │   │   ├── inference.py
+│   │   │   └── model.py
+│   │   └── __init__.py
+│   ├── processors/
 │   │   ├── __init__.py
-│   │   ├── layout.py         # Calls ai/layout, adds WCAG validation
-│   │   ├── alttext.py        # Calls ai/alt_text, ensures compliance
-│   │   ├── ocr.py            # OCR orchestration (external tools)
-│   │   ├── wcag.py           # Rule-based validation
-│   │   └── tagging.py        # PDF tagging (PyMuPDF/iText)
-│   └── pyproject.toml
-│
-├── workers/                  # Cloudflare Workers (https://developers.cloudflare.com/workers/)
+│   │   ├── alttext.py
+│   │   ├── layout.py
+│   │   ├── ocr.py
+│   │   ├── tagging.py
+│   │   └── wcag.py
+│   ├── tests/
+│   │   ├── test_ai_processors.py
+│   │   └── test_runner.py
+│   ├── .python-version
+│   ├── pyproject.toml
+│   ├── runner.py
+│   └── uv.lock
+├── server/
+│   ├── Controllers/
+│   │   └── JobController.cs
+│   ├── HealthChecks/
+│   │   └── DatabaseApiHealthCheck.cs
+│   ├── Properties/
+│   │   └── launchSettings.json
+│   ├── Services/
+│   │   ├── DatabaseApiClient.cs
+│   │   └── MetricsClient.cs
+│   ├── appsettings.Development.json
+│   ├── appsettings.json
+│   ├── appsettings.Production.json
+│   ├── Program.cs
+│   └── server.csproj
+├── server.core/
+│   ├── Domain/
+│   │   ├── ErrorResponse.cs
+│   │   ├── Job.cs
+│   │   ├── JobStatus.cs
+│   │   ├── ProcessingMetric.cs
+│   │   └── User.cs
+│   └── server.core.csproj
+├── tests/
+│   └── server.tests/
+│       ├── DomainModelTests.cs
+│       ├── JobControllerTests.cs
+│       ├── MetricsClientTests.cs
+│       └── server.tests.csproj
+├── workers/
 │   ├── api/
-│   │   ├── upload.ts         # PDF upload to R2
-│   │   ├── submit-job.ts     # Job submission to queue
-│   │   └── job-status.ts     # Status query proxy
-│   ├── wrangler.toml
-│   └── package.json
-│
-├── tests/                    # .NET xUnit tests
-│   ├── JobControllerTests.cs
-│   └── tests.csproj
-│
+│   │   ├── job-status.ts
+│   │   ├── submit-job.ts
+│   │   └── upload.ts
+│   ├── db-api/
+│   │   ├── src/
+│   │   │   └── index.ts
+│   │   ├── docker-init.sh
+│   │   ├── package-lock.json
+│   │   ├── package.json
+│   │   ├── README.md
+│   │   ├── schema.sql
+│   │   ├── tsconfig.json
+│   │   └── wrangler.toml
+│   ├── metrics-ingest/
+│   │   ├── src/
+│   │   │   └── index.ts
+│   │   ├── .gitignore
+│   │   ├── package-lock.json
+│   │   ├── package.json
+│   │   ├── README.md
+│   │   ├── schema.sql
+│   │   ├── tsconfig.json
+│   │   └── wrangler.toml
+│   ├── tests/
+│   │   ├── job-status.test.ts
+│   │   ├── submit-job.test.ts
+│   │   └── upload.test.ts
+│   ├── eslint.config.mjs
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── vitest.config.ts
+│   └── wrangler.toml
 ├── .gitignore
 ├── .markdownlint.json
+├── .yamllint.yml
 ├── app.sln
+├── codecov.yml
 ├── cspell.json
 ├── docker-compose.yml
 ├── global.json
 ├── justfile
+├── package.json
 └── README.md
 ```
 

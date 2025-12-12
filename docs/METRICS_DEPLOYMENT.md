@@ -6,21 +6,21 @@ This guide covers deploying the push-based metrics system using Cloudflare Worke
 
 ```mermaid
 flowchart TD
-    HPC["HPC SLURM Cluster<br/>(Cron Job)<br/>Push Metrics"] -->|HTTPS POST<br/>/ingest| Worker
-    
-    .NET API[".NET API Server<br/>Push Metrics"] -->|HTTPS POST<br/>/ingest| Worker
-    
-    Worker["Cloudflare Worker<br/>Metrics Ingest<br/>• D1 Storage<br/>• Token Auth<br/>• /ingest endpoint<br/>• /metrics endpoint"] --> D1
-    
-    D1["D1 Database<br/>Metrics Storage<br/>• 7-day retention<br/>• Free tier"]
-    
-    Worker -->|Prometheus format<br/>/metrics| Monitoring
-    
-    Monitoring["Prometheus + Grafana<br/>• Scrapes /metrics<br/>• Visualizations<br/>• Alerting"]
-    
+    HPC["HPC SLURM Cluster<br/>(Cron / scheduled job)<br/>Push metrics"] -->|HTTPS POST<br/>/ingest| MetricsWorker
+
+    Server[".NET API Server<br/>(optional push)"] -->|HTTPS POST<br/>/ingest| MetricsWorker
+
+    MetricsWorker["Cloudflare Worker<br/>metrics-ingest<br/>• D1 storage<br/>• Token auth<br/>• /ingest, /metrics, /api/*"] --> D1
+
+    D1["D1 Database<br/>metrics-db<br/>• retention via cron trigger"]
+
+    MetricsWorker -->|Prometheus scrape<br/>/metrics| Monitoring
+
+    Monitoring["Prometheus + Grafana<br/>• Scrapes /metrics<br/>• Dashboards & alerting"]
+
     style HPC fill:#ff9999,stroke:#cc0000,stroke-width:3px,color:#000
-    style .NET API fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
-    style Worker fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
+    style Server fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
+    style MetricsWorker fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
     style D1 fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
     style Monitoring fill:#ffeb99,stroke:#cc9900,stroke-width:3px,color:#000
 ```
@@ -109,11 +109,12 @@ Output:
 curl https://metrics-ingest.<your-account>.workers.dev/metrics
 
 # Test ingestion (replace YOUR_TOKEN)
+# Note: allowed sources are currently "hpc" and "server".
 curl -X POST https://metrics-ingest.<your-account>.workers.dev/ingest \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "source": "test",
+    "source": "server",
     "timestamp": '$(date +%s)',
     "metrics": {
       "test_metric": 42
@@ -136,82 +137,66 @@ routes = [
 npm run deploy
 ```
 
-## Step 2: Configure HPC Metrics Push
+## Step 2: Configure HPC Metrics Push (optional)
 
-### 2.1 Update Script Configuration
+This repository does not currently ship a SLURM-export script. On the cluster, create a small cron-driven script that POSTs JSON to the metrics worker.
 
-Edit `hpc_runner/scripts/export_slurm_metrics.sh`:
+### 2.1 Create an export script on the HPC login node
+
+Create something like `/usr/local/bin/export_slurm_metrics.sh`:
 
 ```bash
-# Replace these values
-METRICS_ENDPOINT="https://metrics-ingest.<your-account>.workers.dev/ingest"
-METRICS_TOKEN="<your-token-from-step-1.4>"
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${METRICS_ENDPOINT:?Set METRICS_ENDPOINT to https://metrics-ingest.<your-account>.workers.dev/ingest}"
+: "${METRICS_TOKEN:?Set METRICS_TOKEN to your bearer token}"
+
+pending_jobs=$(squeue -h -t PENDING | wc -l | tr -d ' ')
+running_jobs=$(squeue -h -t RUNNING | wc -l | tr -d ' ')
+now=$(date +%s)
+
+curl -sS -X POST "$METRICS_ENDPOINT" \
+  -H "Authorization: Bearer $METRICS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"source\":\"hpc\",\"timestamp\":$now,\"metrics\":{\"slurm_pending_jobs\":$pending_jobs,\"slurm_running_jobs\":$running_jobs}}" \
+  >/dev/null
 ```
 
-**Security Best Practice:** Store token in a secure file:
+Then:
 
 ```bash
-# On HPC login node
-echo "export METRICS_TOKEN='your-token-here'" > ~/.metrics_token
-chmod 600 ~/.metrics_token
-
-# Update crontab to source it
-crontab -e
-# Add:
-BASH_ENV=/home/youruser/.metrics_token
-* * * * * /usr/local/bin/export_slurm_metrics.sh
-```
-
-### 2.2 Install Script on HPC
-
-```bash
-# From your local machine
-scp hpc_runner/scripts/export_slurm_metrics.sh user@hpc-login.ucdavis.edu:/tmp/
-
-# On HPC login node
-ssh user@hpc-login.ucdavis.edu
-sudo cp /tmp/export_slurm_metrics.sh /usr/local/bin/
 sudo chmod 755 /usr/local/bin/export_slurm_metrics.sh
-sudo chown root:root /usr/local/bin/export_slurm_metrics.sh
 ```
 
-### 2.3 Test Script Manually
+### 2.2 Store the token securely
+
+On the HPC login node:
 
 ```bash
-# On HPC login node
-export METRICS_ENDPOINT="https://metrics-ingest.<your-account>.workers.dev/ingest"
-export METRICS_TOKEN="your-token-here"
-/usr/local/bin/export_slurm_metrics.sh
-
-# Should output nothing on success
-echo $?  # Should print 0
+echo "export METRICS_TOKEN='your-token-here'" > "$HOME/.metrics_token"
+chmod 600 "$HOME/.metrics_token"
 ```
 
-### 2.4 Add to Cron
+### 2.3 Add to cron
 
 ```bash
-# On HPC login node
 crontab -e
 
-# Add this line (runs every minute):
-# Sources token from secure file instead of exposing in crontab
-* * * * * . ~/.metrics_token && /usr/local/bin/export_slurm_metrics.sh >> /var/log/slurm_metrics.log 2>&1
+# Run every minute; source token from a protected file
+* * * * * . "$HOME/.metrics_token" && METRICS_ENDPOINT="https://metrics-ingest.<your-account>.workers.dev/ingest" /usr/local/bin/export_slurm_metrics.sh >> "$HOME/slurm_metrics.log" 2>&1
 ```
 
-**Security Note:** This sources the token from `~/.metrics_token` (created in step 2.1) instead of embedding it in the crontab, which would expose it via `ps` or process listings.
-
-**Note:** Check with your HPC admin for proper log directory permissions.
-
-### 2.5 Verify Metrics are Flowing
+### 2.4 Verify metrics are flowing
 
 Wait 1-2 minutes, then:
 
 ```bash
-# Check if metrics are being pushed
+# List sources seen in the last hour
 curl https://metrics-ingest.<your-account>.workers.dev/api/sources
-# Should show: ["hpc"]
+# Should include: ["hpc"] (and possibly "server" if you've tested it)
 
-# Get latest HPC metrics
+# Get recent HPC metrics
 curl "https://metrics-ingest.<your-account>.workers.dev/api/metrics?source=hpc&window=5m"
 ```
 
@@ -219,53 +204,61 @@ curl "https://metrics-ingest.<your-account>.workers.dev/api/metrics?source=hpc&w
 
 ### 3.1 Set Environment Variables
 
-For Azure Container Apps:
+Set these values wherever the .NET server runs:
+
+- `METRICS_ENDPOINT` = `https://metrics-ingest.<your-account>.workers.dev/ingest`
+- `METRICS_TOKEN` = your bearer token
+
+For Azure App Service (example):
 
 ```bash
-az containerapp update \
+az webapp config appsettings set \
   --name accessible-pdf-server \
   --resource-group your-rg \
-  --set-env-vars \
+  --settings \
     METRICS_ENDPOINT="https://metrics-ingest.<your-account>.workers.dev/ingest" \
     METRICS_TOKEN="your-token-here"
 ```
 
-For local development:
+For local development (optional override):
 
 ```bash
-# In server/.env or appsettings.Development.json
+# In server/.env
 METRICS_ENDPOINT=https://metrics-ingest.<your-account>.workers.dev/ingest
 METRICS_TOKEN=your-token-here
 ```
 
 ### 3.2 Verify Dependencies
 
-The `MetricsClient` service is already configured in the .NET project with:
+The server includes a `MetricsClient` that can push metrics to the worker.
 
-- `HttpClient` for pushing metrics
-- Configuration binding for `METRICS_ENDPOINT` and `METRICS_TOKEN`
-- Default source: `server`
+Important behavior:
 
-No additional dependencies needed - the service is registered in `Program.cs`.
+- If `METRICS_TOKEN` is empty, pushes are skipped.
+- The client sends `Authorization: Bearer <METRICS_TOKEN>` to `METRICS_ENDPOINT`.
 
-### 3.3 Test Metrics Push
+The client is registered in `server/Program.cs`.
+
+### 3.3 Test ingestion from the server environment
+
+Even before wiring metrics into server code, you can validate outbound connectivity/token/auth by sending a test metric:
 
 ```bash
-# Start .NET API locally
-cd server
-dotnet run
-
-# In another terminal, trigger a job submission (which pushes metrics)
-curl -X POST http://localhost:5165/api/jobs \
+curl -X POST https://metrics-ingest.<your-account>.workers.dev/ingest \
+  -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "pdfUrl": "https://example.com/test.pdf",
-    "options": {}
+    "source": "server",
+    "timestamp": '$(date +%s)',
+    "metrics": {
+      "server_test_metric": 1
+    }
   }'
 
-# Verify metrics were pushed to Cloudflare
 curl "https://metrics-ingest.<your-account>.workers.dev/api/metrics?source=server&window=5m"
 ```
+
+Note: the .NET server does not yet emit metrics automatically in this scaffold; you'll need to call the `MetricsClient` in the code paths you care about (job submission/status checks/etc.).
 
 ## Step 4: Configure Prometheus & Grafana
 
@@ -316,12 +309,11 @@ slurm_pending_jobs
 slurm_submission_latency_seconds
 ```
 
-### 4.5 Import Grafana Dashboard
+### 4.5 Grafana Dashboard
 
-1. Open Grafana → Dashboards → Import
-2. Upload `docs/grafana-dashboard.json`
-3. Select Prometheus data source
-4. Click Import
+No Grafana dashboard JSON is checked into this repository yet.
+
+Create a dashboard by querying the scraped metrics (for example, filter by `source="hpc"` / `source="server"`).
 
 ## Step 5: Monitoring & Maintenance
 
@@ -339,40 +331,29 @@ npm run tail
 curl https://metrics-ingest.<your-account>.workers.dev/api/sources
 
 # Get metrics count (rough estimate)
-npx wrangler d1 execute metrics-db --command "SELECT COUNT(*) FROM metrics"
+cd workers/metrics-ingest
+npm run db:query "SELECT COUNT(*) FROM metrics"
 ```
 
-### 5.3 Database Cleanup
+### 5.3 Data Retention / Cleanup
 
-Metrics older than 7 days should be cleaned up to stay within free tier:
+Data retention is implemented in the worker:
+
+- A cron trigger runs daily (see `workers/metrics-ingest/wrangler.toml`).
+- The worker's scheduled handler deletes rows older than `METRICS_RETENTION_DAYS` (default: 7).
+
+To run cleanup manually (remote DB):
 
 ```bash
-# Create cleanup script
-cat > workers/metrics-ingest/cleanup.sql <<EOF
-DELETE FROM metrics 
-WHERE timestamp < strftime('%s', 'now', '-7 days');
-EOF
-
-# Run via cron (weekly)
-npx wrangler d1 execute metrics-db --file=cleanup.sql
+cd workers/metrics-ingest
+npm run db:query "DELETE FROM metrics WHERE timestamp < strftime('%s', 'now', '-7 days')"
 ```
 
-Or add to Worker as a scheduled job:
+For local development DB:
 
-```typescript
-// In wrangler.toml
-[triggers]
-crons = ["0 2 * * 0"]  # Every Sunday at 2am
-
-// In src/index.ts
-export default {
-  async scheduled(event, env, ctx) {
-    await env.METRICS_DB.prepare(`
-      DELETE FROM metrics 
-      WHERE timestamp < strftime('%s', 'now', '-7 days')
-    `).run();
-  }
-}
+```bash
+cd workers/metrics-ingest
+npm run db:query:local "DELETE FROM metrics WHERE timestamp < strftime('%s', 'now', '-7 days')"
 ```
 
 ### 5.4 Token Rotation
@@ -397,29 +378,30 @@ npx wrangler secret put METRICS_AUTH_TOKEN
 ### HPC metrics not appearing
 
 ```bash
-# On HPC login node, check last run
-tail /var/log/slurm_metrics.log
+# Check your cron/log output (example log path from this guide)
+tail -n 200 "$HOME/slurm_metrics.log"
 
 # Test manually
 export METRICS_TOKEN='your-token'
-export METRICS_ENDPOINT='https://...'
+export METRICS_ENDPOINT='https://metrics-ingest.<your-account>.workers.dev/ingest'
 /usr/local/bin/export_slurm_metrics.sh
 
-# Check if squeue/sacct work
+# Check if SLURM commands work
 squeue -h | wc -l
 ```
 
 ### .NET API server metrics not appearing
 
-```bash
-# Check environment variables
-az containerapp show --name accessible-pdf-server \
-  --resource-group your-rg \
-  --query "properties.configuration.secrets" -o json
+1. Confirm `METRICS_ENDPOINT` and `METRICS_TOKEN` are set in the running environment.
+2. Confirm your server code is actually calling the `MetricsClient` (it is present, but not wired into business logic in this scaffold).
+3. Validate the worker is reachable from the server environment by running the curl test in step 3.3.
 
-# Check logs
-az containerapp logs tail --name accessible-pdf-server \
-  --resource-group your-rg --follow
+If you're on Azure App Service, you can inspect app settings via the portal, or:
+
+```bash
+az webapp config appsettings list \
+  --name accessible-pdf-server \
+  --resource-group your-rg
 ```
 
 ### Worker errors
@@ -430,7 +412,8 @@ cd workers/metrics-ingest
 npm run tail
 
 # Check D1 database
-npx wrangler d1 execute metrics-db --command "SELECT * FROM metrics LIMIT 10"
+cd workers/metrics-ingest
+npm run db:query "SELECT * FROM metrics LIMIT 10"
 ```
 
 ### Prometheus not scraping
