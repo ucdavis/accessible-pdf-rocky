@@ -95,20 +95,28 @@ audit: _ensure-npm _ensure-uv
     
     echo "✅ Security audit complete!"
 
-# Update JS/Python dependencies and restore .NET packages
+# Update JS/Python dependencies and update .NET NuGet packages
 update: _ensure-npm _ensure-uv _ensure-dotnet
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "Updating JS/Python dependencies and restoring .NET packages..."
+    echo "Updating JS/Python dependencies and updating NuGet packages..."
     echo ""
     
-    # Restore .NET packages (does not update versions)
-    # To update NuGet packages to latest, install and run:
-    #   dotnet tool install -g dotnet-outdated-tool
-    #   dotnet outdated -u
-    if [ -d "server" ]; then
+    # Update NuGet package references (and restore)
+    if [ -f "app.sln" ]; then
+        echo "Updating NuGet packages..."
+        # Add .NET global tools to PATH (needed for dotnet-outdated-tool)
+        export PATH="$PATH:$HOME/.dotnet/tools"
+        # Install dotnet-outdated-tool if missing
+        if ! command -v dotnet-outdated >/dev/null; then
+            echo "Installing dotnet-outdated-tool..."
+            dotnet tool install -g dotnet-outdated-tool
+        fi
+        # Upgrade package versions in-place
+        dotnet outdated app.sln -u
+        echo ""
         echo "Restoring .NET packages..."
-        dotnet restore
+        dotnet restore app.sln
         echo ""
     fi
     
@@ -123,11 +131,19 @@ update: _ensure-npm _ensure-uv _ensure-dotnet
     fi
     
     # Update npm packages for workers
+    # Note: db-api and metrics-ingest are separate npm packages with their own lockfiles.
     if [ -d "workers" ]; then
         echo "Updating workers npm packages..."
         (
             cd workers
             npm update
+
+            for dir in db-api metrics-ingest; do
+                if [ -f "$dir/package.json" ]; then
+                    echo "Updating workers/$dir npm packages..."
+                    (cd "$dir" && npm update)
+                fi
+            done
         )
         echo ""
     fi
@@ -143,10 +159,7 @@ update: _ensure-npm _ensure-uv _ensure-dotnet
         echo ""
     fi
     
-    echo "✅ JS/Python dependencies updated and .NET packages restored."
-    echo "   To upgrade NuGet package versions, run:"
-    echo "     dotnet tool install -g dotnet-outdated-tool"
-    echo "     dotnet outdated -u"
+    echo "✅ Dependencies updated (JS/Python + NuGet)."
 
 # Build all projects
 build: _ensure-npm _ensure-dotnet

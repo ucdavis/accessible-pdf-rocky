@@ -32,7 +32,7 @@ if [ ! -f ".wrangler/.schema_applied" ]; then
 
 	# Start wrangler in background to let it create the database
 	echo "Starting wrangler to create database structure..."
-	npx wrangler dev "$@" &
+	./node_modules/.bin/wrangler dev "$@" &
 	WRANGLER_PID=$!
 
 	# Wait for wrangler to create the database
@@ -82,5 +82,31 @@ if [ ! -f ".wrangler/.schema_applied" ]; then
 fi
 
 # Start wrangler dev server
+# Run Wrangler directly so a Docker stop/Ctrl+C doesn't show up as an npm "error".
 echo "Starting wrangler dev server..."
-exec npx wrangler dev "$@"
+
+terminated=0
+child_pid=""
+
+trap '
+	terminated=1
+	echo "Stopping Wrangler..."
+	if [ -n "$child_pid" ] && kill -0 "$child_pid" 2>/dev/null; then
+		kill -TERM "$child_pid" 2>/dev/null || true
+	fi
+' INT TERM
+
+./node_modules/.bin/wrangler dev "$@" &
+child_pid=$!
+
+set +e
+wait "$child_pid"
+exit_code=$?
+set -e
+
+# If we were asked to stop (Docker/Compose sends SIGTERM), exit cleanly.
+if [ "$terminated" -eq 1 ]; then
+	exit 0
+fi
+
+exit "$exit_code"
