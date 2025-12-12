@@ -141,7 +141,7 @@ public class MetricsClientTests
 
         // Assert
         Assert.NotNull(capturedRequest);
-        var content = await capturedRequest!.Content!.ReadAsStringAsync();
+        var content = await capturedRequest!.Content!.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var payload = JsonSerializer.Deserialize<JsonElement>(content);
         var metricsObj = payload.GetProperty("metrics");
 
@@ -172,7 +172,7 @@ public class MetricsClientTests
 
         // Assert
         Assert.NotNull(capturedRequest);
-        var content = await capturedRequest!.Content!.ReadAsStringAsync();
+        var content = await capturedRequest!.Content!.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var payload = JsonSerializer.Deserialize<JsonElement>(content);
         var metricsObj = payload.GetProperty("metrics");
 
@@ -203,7 +203,7 @@ public class MetricsClientTests
 
         // Assert
         Assert.NotNull(capturedRequest);
-        var content = await capturedRequest!.Content!.ReadAsStringAsync();
+        var content = await capturedRequest!.Content!.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var payload = JsonSerializer.Deserialize<JsonElement>(content);
         var metricsObj = payload.GetProperty("metrics");
 
@@ -231,7 +231,7 @@ public class MetricsClientTests
 
         // Assert
         Assert.NotNull(capturedRequest);
-        var content = await capturedRequest!.Content!.ReadAsStringAsync();
+        var content = await capturedRequest!.Content!.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var payload = JsonSerializer.Deserialize<JsonElement>(content);
         var metricsObj = payload.GetProperty("metrics");
 
@@ -259,7 +259,7 @@ public class MetricsClientTests
 
         // Assert
         Assert.NotNull(capturedRequest);
-        var content = await capturedRequest!.Content!.ReadAsStringAsync();
+        var content = await capturedRequest!.Content!.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var payload = JsonSerializer.Deserialize<JsonElement>(content);
         var metricsObj = payload.GetProperty("metrics");
 

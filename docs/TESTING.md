@@ -314,8 +314,8 @@ npm test -- -u
 
 ### .NET Dependencies
 
-- `xunit` - Test framework
-- `xunit.runner.visualstudio` - Test runner
+- `xunit.v3` - Test framework
+- `xunit.runner.visualstudio` - Test runner adapter
 - `Moq` or `NSubstitute` - Mocking libraries
 - `coverlet.collector` - Coverage collection
 
