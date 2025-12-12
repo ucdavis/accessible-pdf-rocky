@@ -339,7 +339,7 @@ The `hpc_runner/` layer orchestrates heavy ML processing:
 - Parses tables
 - Outputs results
 
-### .NET 8 Web API Job Pipeline (Conceptual)
+### .NET 10 Web API Job Pipeline (Conceptual)
 
 ```csharp
 // Conceptual - Current implementation focuses on orchestration
@@ -404,7 +404,7 @@ def analyze_pdf(pdf_path: str, job_id: str) -> dict:
 
 ### Service Layer Organization (.NET API Server)
 
-Runs on [.NET 8 Web API](https://learn.microsoft.com/en-us/aspnet/core/web-api/) server, orchestrates Cloudflare ↔ HPC ↔ [R2](https://developers.cloudflare.com/r2/):
+Runs on [.NET 10 Web API](https://learn.microsoft.com/en-us/aspnet/core/web-api/) server, orchestrates Cloudflare ↔ HPC ↔ [R2](https://developers.cloudflare.com/r2/):
 
 ```
 server/Services/
@@ -561,7 +561,7 @@ This separation keeps ML model concerns separate from business logic and makes t
 
 | Layer | Where | Resources | Purpose |
 |-------|-------|-----------|----------|
-| `.NET API services/` | .NET 8 Web API server (VM) | CPU only, lightweight | Orchestrate Cloudflare ↔ HPC ↔ R2 flow |
+| `.NET API services/` | .NET 10 Web API server (VM) | CPU only, lightweight | Orchestrate Cloudflare ↔ HPC ↔ R2 flow |
 | `hpc_runner/` | HPC GPU nodes | A100/H100 GPUs, 10s GB RAM | Heavy ML processing |
 
 #### Why Similar Names?
@@ -722,7 +722,7 @@ flowchart TD
 
 ### D1 Database with API Worker
 
-The system uses [Cloudflare D1](https://developers.cloudflare.com/d1/) (SQLite) accessed via a dedicated API Worker (`workers/db-api`). .NET 8 Web API controller communicates with the database through HTTP REST API, not direct connections.
+The system uses [Cloudflare D1](https://developers.cloudflare.com/d1/) (SQLite) accessed via a dedicated API Worker (`workers/db-api`). .NET 10 Web API controller communicates with the database through HTTP REST API, not direct connections.
 
 **Benefits:**
 

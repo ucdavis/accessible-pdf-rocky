@@ -1,6 +1,6 @@
 # Accessible PDF AI
 
-Production-grade accessible PDF system with [Cloudflare Workers](https://developers.cloudflare.com/workers/), [.NET 8](https://dotnet.microsoft.com/), and HPC/SLURM integration.
+Production-grade accessible PDF system with [Cloudflare Workers](https://developers.cloudflare.com/workers/), [.NET 10](https://dotnet.microsoft.com/), and HPC/SLURM integration.
 
 [![CI](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/ci.yml/badge.svg)](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/codeql.yml/badge.svg)](https://github.com/ucdavis/accessible-pdf-rocky/actions/workflows/codeql.yml)
@@ -30,7 +30,7 @@ Designed for UC Davis document remediation needs.
 
 - `client/` – [React 19](https://react.dev/) + [Vite](https://vite.dev/) frontend with [TanStack Router](https://tanstack.com/router) and [Query](https://tanstack.com/query)
 - `hpc_runner/` – SLURM job runner (heavy ML + PDF, Python)
-- `server/` – [.NET 8](https://dotnet.microsoft.com/) Web API bridge to HPC cluster
+- `server/` – [.NET 10](https://dotnet.microsoft.com/) Web API bridge to HPC cluster
 - `server.core/` – Domain models and shared logic
 - `tests/` – .NET test project with xUnit
 - `workers/` – [Cloudflare Workers](https://developers.cloudflare.com/workers/) (R2 + Queues, TypeScript)
