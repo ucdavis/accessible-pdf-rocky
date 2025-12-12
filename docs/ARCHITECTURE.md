@@ -1,6 +1,6 @@
 # Architecture
 
-This document outlines the production-grade architecture for the accessible PDF system, integrating [Cloudflare Workers](https://developers.cloudflare.com/workers/), [.NET 8](https://learn.microsoft.com/en-us/aspnet/core/) on Azure, and local HPC with SLURM.
+This document outlines the production-grade architecture for the accessible PDF system, integrating [Cloudflare Workers](https://developers.cloudflare.com/workers/), [.NET 10](https://learn.microsoft.com/en-us/aspnet/core/) on Azure, and local HPC with SLURM.
 
 ## System Architecture Overview
 
@@ -24,7 +24,7 @@ This document outlines the production-grade architecture for the accessible PDF 
 
 Cloudflare provides fast ingress, scaling, and routing—not heavy compute.
 
-### 🟢 [.NET 8](https://learn.microsoft.com/en-us/aspnet/core/) Layer (job controller)
+### 🟢 [.NET 10](https://learn.microsoft.com/en-us/aspnet/core/) Layer (job controller)
 
 Runs on [Azure App Service](https://learn.microsoft.com/en-us/azure/app-service/) (Linux):
 
@@ -71,7 +71,7 @@ flowchart TD
     
     Queue["Cloudflare Queue<br/>(job messages)"] -->|dequeues| Controller
     
-    Controller[".NET 8 Web API<br/>(Azure App Service)<br/>• Pull Queue Jobs<br/>• Generate R2 URLs<br/>• Submit SLURM Jobs<br/>• Monitor sacct/squeue"] --> HPC
+    Controller[".NET 10 Web API<br/>(Azure App Service)<br/>• Pull Queue Jobs<br/>• Generate R2 URLs<br/>• Submit SLURM Jobs<br/>• Monitor sacct/squeue"] --> HPC
     Controller -->|HTTP API| DBWorker
     
     DBWorker["D1 API Worker<br/>• Job tracking<br/>• User management<br/>• Processing metrics"]
@@ -116,7 +116,7 @@ accessible-pdf-rocky/
 │   ├── vite.config.ts        # Vite configuration with API proxy
 │   └── package.json
 │
-├── server/                   # .NET 8 Web API (https://learn.microsoft.com/en-us/aspnet/core/)
+├── server/                   # .NET 10 Web API (https://learn.microsoft.com/en-us/aspnet/core/)
 │   ├── Program.cs            # Application entry point
 │   ├── appsettings.json      # Configuration
 │   ├── Controllers/
@@ -602,10 +602,10 @@ export default {
 - **Environment Variables**: `.env` for API base URL
 - **CDN**: Global edge deployment with automatic scaling
 
-### .NET 8 Web API (Azure App Service)
+### .NET 10 Web API (Azure App Service)
 
 - **Deployment**: Azure App Service (Linux) via Azure Pipelines
-- **Runtime**: .NET 8.0.400+
+- **Runtime**: .NET 10.0.100+
 - **Must be accessible from**: Cloudflare (public internet) and HPC cluster
 - **Needs credentials for**:
   - Cloudflare Queues (API token)

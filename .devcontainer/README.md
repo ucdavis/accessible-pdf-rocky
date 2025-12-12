@@ -7,7 +7,7 @@ This directory contains the configuration for developing accessible-pdf-rocky in
 The dev container provides:
 
 - **Node.js 20** - For client (React/Vite) and workers (Cloudflare Workers)
-- **.NET 8.0 SDK** - For the ASP.NET Core server
+- **.NET 10.0 SDK** - For the ASP.NET Core server
 - **Python 3.12 + uv** - For the HPC runner
 - **Git** - Version control
 - **Essential VS Code extensions** - C# Dev Kit, ESLint, Prettier, Ruff, etc.

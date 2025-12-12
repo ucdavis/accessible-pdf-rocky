@@ -11,7 +11,7 @@ flowchart LR
     A[User] --> B[Cloudflare Pages<br/>React + Vite]
     B --> C[Workers]
     C --> D[R2 + Queues]
-    D --> E[.NET 8 API<br/>Azure]
+    D --> E[.NET 10 API<br/>Azure]
     E --> F[SLURM/HPC]
     F --> G[R2]
     
@@ -28,7 +28,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     A[User] --> B[React + Vite<br/>localhost:5173]
-    B --> C[.NET 8 API<br/>localhost:5165]
+    B --> C[.NET 10 API<br/>localhost:5165]
     C --> D[Local FS]
     C --> E[D1 API Worker<br/>localhost:8787]
     
@@ -56,7 +56,7 @@ just dev
 
 This starts:
 
-- .NET 8 API server on port 5165
+- .NET 10 API server on port 5165
 - React + Vite client on port 5173
 - D1 API worker on port 8787
 

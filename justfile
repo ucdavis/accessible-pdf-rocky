@@ -27,11 +27,11 @@ _ensure-dotnet:
     #!/usr/bin/env bash
     set -euo pipefail
     command -v dotnet >/dev/null || { echo "❌ 'dotnet' not found. Install from https://dotnet.microsoft.com/download"; exit 1; }
-    # Check for .NET 8 or higher
+    # Check for .NET 10 or higher
     version=$(dotnet --version | cut -d. -f1)
-    if [ "$version" -lt 8 ]; then
-        echo "⚠️  .NET 8+ required but $(dotnet --version) found"
-        echo "   Install .NET 8 or later from https://dotnet.microsoft.com/download"
+    if [ "$version" -lt 10 ]; then
+        echo "⚠️  .NET 10+ required but $(dotnet --version) found"
+        echo "   Install .NET 10 or later from https://dotnet.microsoft.com/download"
         exit 1
     fi
 
