@@ -44,7 +44,7 @@ services:
     depends_on:
       db-api:
         condition: service_healthy
-    command: dotnet watch --project /app/server/server.csproj
+    command: dotnet watch --project /app/server/server.csproj --no-launch-profile
 
   # React/Vite Client
   client:

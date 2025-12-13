@@ -5,6 +5,11 @@ services:
       dockerfile: .devcontainer/dev.Dockerfile
     volumes:
       - ..:/workspace:cached
+      # Keep deps inside the container (avoid host platform conflicts)
+      - client-node-modules:/workspace/client/node_modules
+      - workers-node-modules:/workspace/workers/node_modules
+      - metrics-ingest-node-modules:/workspace/workers/metrics-ingest/node_modules
+      - hpc-runner-venv:/workspace/hpc_runner/.venv
     depends_on:
       db-api:
         condition: service_healthy
@@ -32,10 +37,14 @@ services:
       retries: 5
     networks:
       - dev
-    command: sh -c "npm install && npx wrangler dev src/index.ts --port 8787 --ip 0.0.0.0"
+    command: sh docker-init.sh
 
 volumes:
   db-api-node-modules:
+  client-node-modules:
+  workers-node-modules:
+  metrics-ingest-node-modules:
+  hpc-runner-venv:
 
 networks:
   dev:

@@ -8,7 +8,7 @@ The dev container provides:
 
 - **Node.js 20** - For client (React/Vite) and workers (Cloudflare Workers)
 - **.NET 10.0 SDK** - For the ASP.NET Core server
-- **Python 3.12 + uv** - For the HPC runner
+- **Python 3.13 + uv** - For the HPC runner
 - **Git** - Version control
 - **Essential VS Code extensions** - C# Dev Kit, ESLint, Prettier, Ruff, etc.
 
@@ -45,16 +45,16 @@ The following ports are automatically forwarded:
 
 ## Development Workflow
 
-Once the container is running, you can use the standard `just` commands:
+In the Dev Container, the `db-api` worker is already started as a sidecar service.
+
+Use `just` to run the app processes inside the container:
 
 ```bash
-# Start all services with Docker Compose
-just dev
+# Start the .NET server (in one terminal)
+just dev-server
 
-# Or start services individually for development:
-just dev-client    # Start React dev server
-just dev-server    # Start .NET server
-just dev-workers   # Start workers in dev mode
+# Start the React client (in another terminal)
+just dev-client
 
 # Run tests
 just test
@@ -66,6 +66,8 @@ just lint
 just help
 ```
 
+Note: `just dev` uses the repo root `docker-compose.yml` (intended for running from the host). It is not meant to be run inside the Dev Container unless you intentionally configure Docker-outside-of-Docker.
+
 ## Environment Variables
 
 The dev container automatically sets:
@@ -74,6 +76,8 @@ The dev container automatically sets:
 - `ASPNETCORE_URLS=http://0.0.0.0:5165`
 - `DB_API_URL=http://db-api:8787`
 - `DB_API_TOKEN=dev-token`
+- `IN_DEVCONTAINER=1`
+- `DOTNET_USE_POLLING_FILE_WATCHER=1`
 
 ## Customization
 

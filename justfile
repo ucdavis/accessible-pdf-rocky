@@ -218,12 +218,20 @@ commit-check: lint test-coverage
     @echo "🚀 Ready to commit! All checks passed!"
 
 # Start all services with Docker Compose (attached)
+# Note: this is intended to be run from the host.
 dev:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ "${IN_DEVCONTAINER:-}" = "1" ]; then
+        echo "❌ 'just dev' is intended for running from the host (it uses docker compose)." >&2
+        echo "   Inside the Dev Container, run 'just dev-server' and 'just dev-client' in separate terminals." >&2
+        exit 1
+    fi
     docker compose up --build
 
 # Start only server (local)
 dev-server: _ensure-dotnet
-    dotnet watch --project server/server.csproj
+    dotnet watch --project server/server.csproj --no-launch-profile
 
 # Stop all Docker services
 dev-down:

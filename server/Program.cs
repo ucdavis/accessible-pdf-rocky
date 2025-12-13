@@ -98,7 +98,10 @@ else
 }
 
 // Ensure HTTPS in production
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseCors("AllowClient");
 app.MapControllers();

@@ -8,13 +8,13 @@ This guide explains how to set up and run the accessible-pdf-rocky system locall
 
 ```mermaid
 flowchart LR
-    A[User] --> B[Cloudflare Pages<br/>React + Vite]
-    B --> C[Workers]
-    C --> D[R2 + Queues]
-    D --> E[.NET 10 API<br/>Azure]
-    E --> F[SLURM/HPC]
-    F --> G[R2]
-    
+    A["User"] --> B["Cloudflare Pages<br/>React + Vite"]
+    B --> C["Workers"]
+    C --> D["R2 + Queues"]
+    D --> E[".NET 10 API<br/>Azure"]
+    E --> F["SLURM/HPC"]
+    F --> G["R2"]
+
     style B fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
     style C fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
     style D fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
@@ -27,10 +27,10 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    A[User] --> B[React + Vite<br/>localhost:5173]
-    B --> C[.NET 10 API<br/>localhost:5165]
-    C --> D[D1 API Worker (db-api)<br/>localhost:8787]
-    
+    A["User"] --> B["React + Vite<br/>localhost:5173"]
+    B --> C[".NET 10 API<br/>localhost:5165"]
+    C --> D["D1 API Worker (db-api)<br/>localhost:8787"]
+
     style B fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
     style C fill:#90ee90,stroke:#228b22,stroke-width:3px,color:#000
     style D fill:#80d4ff,stroke:#0066cc,stroke-width:3px,color:#000
